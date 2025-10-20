@@ -41,9 +41,9 @@ my_mnb = MultinomialNaiveBayes()
 my_mnb.fit(X_train, y_train)
 my_y_pred = my_mnb.predict(X_test)
 
-sk_gnb = MultinomialNB()
-sk_gnb.fit(X_train, y_train)
-sk_y_pred = sk_gnb.predict(X_test)
+sk_mnb = MultinomialNB()
+sk_mnb.fit(X_train, y_train)
+sk_y_pred = sk_mnb.predict(X_test)
 
 print("Custom MultinomialNB accuracy:", accuracy_score(y_test, my_y_pred))
 print("Sklearn MultinomialNB accuracy:", accuracy_score(y_test, sk_y_pred))
