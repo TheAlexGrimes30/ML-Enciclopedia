@@ -2,7 +2,7 @@ from collections import Counter
 
 import numpy as np
 from sklearn.datasets import make_classification
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
 
@@ -120,14 +120,21 @@ custom_tree = DecisionTreeCustom(max_depth=5, criterion='gini')
 custom_tree.fit(X_train, y_train)
 
 y_pred_custom = custom_tree.predict(X_test)
-acc_custom = accuracy_score(y_test, y_pred_custom)
 
 sk_tree = DecisionTreeClassifier(max_depth=5, criterion='gini', random_state=42)
 
 sk_tree.fit(X_train, y_train)
 
 y_pred_sk = sk_tree.predict(X_test)
-acc_sk = accuracy_score(y_test, y_pred_sk)
 
-print(f"Custom Tree: accuracy={acc_custom:.4f}")
-print(f"Sklearn Tree: accuracy={acc_sk:.4f}")
+print("Custom Decision Tree accuracy:", accuracy_score(y_test, y_pred_custom))
+print("Custom Decision Tree precision:", precision_score(y_test, y_pred_custom))
+print("Custom Decision Tree recall:", recall_score(y_test, y_pred_custom))
+print("Custom Decision Tree f1 score:", f1_score(y_test, y_pred_custom))
+print("Custom Decision Tree roc auc score:", roc_auc_score(y_test, y_pred_custom))
+print("\n")
+print("Sklearn Decision Tree accuracy:", accuracy_score(y_test, y_pred_sk))
+print("Sklearn Decision Tree precision:", precision_score(y_test, y_pred_sk))
+print("Sklearn Decision Tree recall:", recall_score(y_test, y_pred_sk))
+print("Sklearn Decision Tree f1 score:", f1_score(y_test, y_pred_sk))
+print("Sklearn Decision Tree roc auc score:", roc_auc_score(y_test, y_pred_sk))

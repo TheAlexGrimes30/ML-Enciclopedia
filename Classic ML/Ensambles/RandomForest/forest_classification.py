@@ -3,7 +3,7 @@ from collections import Counter
 import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 
 
@@ -138,9 +138,17 @@ rf = RandomForestClassifier(n_estimators=10, max_depth=5, random_state=42)
 rf.fit(X_train, y_train)
 y_pred = rf.predict(X_test)
 
-print("Accuracy (Custom RF):", accuracy_score(y_test, y_pred_custom))
-print("Accuracy (sklearn RF):", accuracy_score(y_test, y_pred))
-
+print("Custom Random Forest accuracy:", accuracy_score(y_test, y_pred_custom))
+print("Custom Random Forest precision:", precision_score(y_test, y_pred_custom))
+print("Custom Random Forest recall:", recall_score(y_test, y_pred_custom))
+print("Custom Random Forest f1 score:", f1_score(y_test, y_pred_custom))
+print("Custom Random Forest roc auc score:", roc_auc_score(y_test, y_pred_custom))
+print("\n")
+print("Sklearn Random Forest accuracy:", accuracy_score(y_test, y_pred))
+print("Sklearn Random Forest precision:", precision_score(y_test, y_pred))
+print("Sklearn Random Forest recall:", recall_score(y_test, y_pred))
+print("Sklearn Random Forest f1 score:", f1_score(y_test, y_pred))
+print("Sklearn Random Forest roc auc score:", roc_auc_score(y_test, y_pred))
 
 
 

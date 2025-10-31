@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.neighbors import KNeighborsClassifier
 
 class KNNClassifier:
@@ -43,4 +43,13 @@ sk_knn.fit(X_train, y_train)
 y_pred_sk = sk_knn.predict(X_test)
 
 print("Custom KNNClassifier accuracy:", accuracy_score(y_test, y_pred_my))
+print("Custom KNNClassifier precision:", precision_score(y_test, y_pred_my))
+print("Custom KNNClassifier recall:", recall_score(y_test, y_pred_my))
+print("Custom KNNClassifier f1 score:", f1_score(y_test, y_pred_my))
+print("Custom KNNClassifier roc auc score:", roc_auc_score(y_test, y_pred_my))
+print("\n")
 print("Sklearn KNNClassifier accuracy:", accuracy_score(y_test, y_pred_sk))
+print("Sklearn KNNClassifier precision:", precision_score(y_test, y_pred_sk))
+print("Sklearn KNNClassifier recall:", recall_score(y_test, y_pred_sk))
+print("Sklearn KNNClassifier f1 score:", f1_score(y_test, y_pred_sk))
+print("Sklearn KNNClassifier roc auc score:", roc_auc_score(y_test, y_pred_sk))

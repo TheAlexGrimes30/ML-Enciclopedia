@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.datasets import make_regression
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeRegressor
 
@@ -86,12 +86,13 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_
 custom_tree = DecisionTreeRegressorCustom(max_depth=5)
 custom_tree.fit(X_train, y_train)
 y_pred_custom = custom_tree.predict(X_test)
-mse_custom = mean_squared_error(y_test, y_pred_custom)
 
 sk_tree = DecisionTreeRegressor(max_depth=5, random_state=42)
 sk_tree.fit(X_train, y_train)
 y_pred_sk = sk_tree.predict(X_test)
-mse_sk = mean_squared_error(y_test, y_pred_sk)
 
-print(f"Custom Tree MSE: {mse_custom:.2f}")
-print(f"Sklearn Tree MSE: {mse_sk:.2f}")
+print("Custom Decision Tree MSE:", mean_squared_error(y_test, y_pred_custom))
+print("Custom Decision Tree R2:", r2_score(y_test, y_pred_custom))
+print("\n")
+print("Custom Decision Tree MSE:", mean_squared_error(y_test, y_pred_sk))
+print("Sklearn Decision Tree R2:", r2_score(y_test, y_pred_sk))

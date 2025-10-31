@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.datasets import make_regression
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, mean_squared_error
 from sklearn.neighbors import KNeighborsRegressor
 
 class KNNRegressor:
@@ -33,5 +33,8 @@ sk_knn_reg = KNeighborsRegressor(n_neighbors=5)
 sk_knn_reg.fit(Xr_train, yr_train)
 yr_pred_sk = sk_knn_reg.predict(Xr_test)
 
+print("Custom KNNRegressor MSE:", mean_squared_error(yr_test, yr_pred_my))
 print("Custom KNNRegressor R2:", r2_score(yr_test, yr_pred_my))
+print("\n")
+print("Custom KNNRegressor MSE:", mean_squared_error(yr_test, yr_pred_sk))
 print("Sklearn KNNRegressor R2:", r2_score(yr_test, yr_pred_sk))

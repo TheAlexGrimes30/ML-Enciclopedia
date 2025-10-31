@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.datasets import make_regression
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
 
@@ -106,9 +106,13 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_
 rf_custom = RandomForestRegressorCustom(n_estimators=10, max_depth=5)
 rf_custom.fit(X_train, y_train)
 y_pred_custom = rf_custom.predict(X_test)
-print("MSE (Custom RF):", mean_squared_error(y_test, y_pred_custom))
 
 rf_sklearn = RandomForestRegressor(n_estimators=10, max_depth=5, random_state=42)
 rf_sklearn.fit(X_train, y_train)
-y_pred_sklearn = rf_sklearn.predict(X_test)
-print("MSE (Sklearn RF):", mean_squared_error(y_test, y_pred_sklearn))
+y_pred_sk = rf_sklearn.predict(X_test)
+
+print("Custom Random Forest MSE:", mean_squared_error(y_test, y_pred_custom))
+print("Custom Random Forest R2:", r2_score(y_test, y_pred_custom))
+print("\n")
+print("Custom Random Forest MSE:", mean_squared_error(y_test, y_pred_sk))
+print("Sklearn Random Forest R2:", r2_score(y_test, y_pred_sk))
