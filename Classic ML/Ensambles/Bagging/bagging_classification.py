@@ -123,6 +123,7 @@ class BaggingClassifierCustom:
             model = self.base_estimator()
             model.fit(X_sample, y_sample)
             self.models.append(model)
+            self.oob_indices.append(oob_idx)
 
     def predict(self, X):
         preds = np.array([model.predict(X) for model in self.models])
@@ -130,6 +131,28 @@ class BaggingClassifierCustom:
         for col in preds.T:
             final_preds.append(Counter(col).most_common(1)[0][0])
         return np.array(final_preds)
+
+    def oob_score(self, X, y):
+        n_samples = X.shape[0]
+        votes = [[] for _ in range(n_samples)]
+
+        for model, oob_idx in zip(self.models, self.oob_indices):
+            if len(oob_idx) == 0:
+                continue
+
+            preds = model.predict(X[oob_idx])
+            for i, idx in enumerate(oob_idx):
+                votes[idx].append(preds[i])
+
+        y_pred_oob = np.zeros(n_samples)
+        for i in range(n_samples):
+            if votes[i]:
+                y_pred_oob[i] = Counter(votes[i]).most_common(1)[0][0]
+            else:
+                y_pred_oob[i] = -1
+
+        mask = y_pred_oob != -1
+        return np.mean(y[mask] == y_pred_oob[mask])
 
 X, y = make_classification(n_samples=500, n_features=5, n_informative=3,
                            n_redundant=0, n_classes=2, random_state=42)
@@ -140,7 +163,7 @@ bag_custom = BaggingClassifierCustom(base_estimator=lambda: DecisionTreeCustom(m
 bag_custom.fit(X_train, y_train)
 y_pred_custom = bag_custom.predict(X_test)
 
-bag_sklearn = BaggingClassifier(estimator=DecisionTreeClassifier(max_depth=5), n_estimators=10, random_state=42)
+bag_sklearn = BaggingClassifier(estimator=DecisionTreeClassifier(max_depth=5), n_estimators=10, oob_score=True, random_state=42)
 bag_sklearn.fit(X_train, y_train)
 y_pred_sklearn = bag_sklearn.predict(X_test)
 
@@ -149,9 +172,13 @@ print("Custom Bagging precision:", precision_score(y_test, y_pred_custom))
 print("Custom Bagging recall:", recall_score(y_test, y_pred_custom))
 print("Custom Bagging f1 score:", f1_score(y_test, y_pred_custom))
 print("Custom Bagging roc auc score:", roc_auc_score(y_test, y_pred_custom))
+print("Custom Bagging OOB score:", bag_custom.oob_score(X_train, y_train))
 print("\n")
 print("Sklearn Bagging accuracy:", accuracy_score(y_test, y_pred_sklearn))
 print("Sklearn Bagging precision:", precision_score(y_test, y_pred_sklearn))
 print("Sklearn Bagging recall:", recall_score(y_test, y_pred_sklearn))
 print("Sklearn Bagging f1 score:", f1_score(y_test, y_pred_sklearn))
 print("Sklearn Bagging roc auc score:", roc_auc_score(y_test, y_pred_sklearn))
+print("Sklearn Bagging OOB score:", bag_sklearn.oob_score_)
+
+
