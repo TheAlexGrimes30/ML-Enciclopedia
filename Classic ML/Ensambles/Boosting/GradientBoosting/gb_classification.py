@@ -87,6 +87,7 @@ class CustomGradientBoostingClassifier:
         self.learning_rate = learning_rate
         self.max_depth = max_depth
         self.models = []
+        self.gammas = []
         self.F0 = None
 
     def _sigmoid(self, z):
@@ -99,19 +100,26 @@ class CustomGradientBoostingClassifier:
         Fm = np.full(y.shape, self.F0)
 
         for _ in range(self.n_estimators):
-            p = self._sigmoid(Fm)
-            residuals = y - (2 * p - 1)
+            p = self._sigmoid(2 * Fm)
+            residuals = 2 * y * (1 - p)
 
             tree = self.base_estimator(max_depth=self.max_depth)
             tree.fit(X, residuals)
-            self.models.append(tree)
+            h = tree.predict(X)
 
-            Fm += self.learning_rate * tree.predict(X)
+            numerator = np.sum(residuals * h)
+            denominator = np.sum(np.abs(h) * (2 * p * (1 - p))) + 1e-10
+            gamma = numerator / denominator
+
+            Fm += self.learning_rate * gamma * h
+
+            self.models.append(tree)
+            self.gammas.append(gamma)
 
     def predict_proba(self, X):
-        Fm= np.full(X.shape[0], self.F0)
-        for tree in self.models:
-            Fm += self.learning_rate * tree.predict(X)
+        Fm = np.full(X.shape[0], self.F0)
+        for tree, gamma in zip(self.models, self.gammas):
+            Fm += self.learning_rate * gamma * tree.predict(X)
         proba = self._sigmoid(Fm)
         return np.vstack([1 - proba, proba]).T
 
