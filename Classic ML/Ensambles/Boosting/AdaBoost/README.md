@@ -13,18 +13,56 @@
 
 ## 2️. Формулы ансамбля
 
-### Вес модели:
+#### Вес модели:
 $
 \alpha_m = \frac{1}{2} \ln \frac{1 - \varepsilon_m}{\varepsilon_m}
 $
+
 где  
-$varepsilon_m$ — ошибка $m$-й модели.
+$\varepsilon_m$ — ошибка $m$-й модели:
 
-### Итоговое предсказание:
 $
-\hat{y}(x) = \text{sign}\left( \sum_{m=1}^{M} \alpha_m f_m(x) \right)
+\varepsilon_m = \frac{\sum_{i=1}^{N} w_i^{(m)} \cdot \mathbb{I}(y_i \neq f_m(x_i))}{\sum_{i=1}^{N} w_i^{(m)}}
 $
 
+#### Обновление весов объектов:
+$
+w_i^{(m+1)} = w_i^{(m)} \cdot e^{-\alpha_m y_i f_m(x_i)}
+$
+
+#### Итоговое предсказание:
+$
+\hat{y}(x) = \text{sign}\left(\sum_{m=1}^{M} \alpha_m f_m(x)\right)
+$
+
+---
+
+###  AdaBoost.R2 для регрессии
+
+#### Относительная ошибка:
+$
+e_i = \frac{|y_i - f_m(x_i)|}{\max_j |y_j - f_m(x_j)|}
+$
+
+#### Средневзвешенная ошибка модели:
+$
+\varepsilon_m = \sum_{i=1}^{N} w_i^{(m)} e_i
+$
+
+#### Вес модели:
+$
+\beta_m = \frac{\varepsilon_m}{1 - \varepsilon_m}
+$
+
+#### Обновление весов объектов:
+$
+w_i^{(m+1)} = w_i^{(m)} \cdot \beta_m^{(1 - e_i)}
+$
+
+#### Итоговое предсказание ансамбля:
+$
+\hat{y}(x) = \frac{\sum_{m=1}^{M} \log(1 / \beta_m) \cdot f_m(x)}{\sum_{m=1}^{M} \log(1 / \beta_m)}
+$
 ---
 
 ## 3️. Механизм обучения
