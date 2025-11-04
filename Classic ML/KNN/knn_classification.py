@@ -5,14 +5,38 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from sklearn.neighbors import KNeighborsClassifier
 
 class KNNClassifier:
-    def __init__(self, k: int = 3):
+    """
+    KNN Classifier class
+    methods: constructor, fit, predict
+    """
+    def __init__(self, k: int = 3) -> None:
+        """
+        Constructor
+        :param k: number of neighbours
+        :return: None
+        """
         self.k = k
 
-    def fit(self, X, y):
+    def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Fit saves training data for KNN without training phase (lazy learning)
+        :param X: training samples, shape (n_samples, n_features)
+        :param y: target labels, shape (n_samples,)
+        :return: None
+        """
         self.X_train = X
         self.y_train = y
 
-    def predict(self, X_test):
+    def predict(self, X_test: np.ndarray) -> np.ndarray:
+        """
+        Predict method
+        For each test sample:
+         - compute Euclidean distances to all training samples
+         - select k nearest samples
+         - assign the most common label among them
+        :param X_test: test samples, shape (n_samples, n_features)
+        :return: predicted labels as np.ndarray
+        """
         predictions = []
         for x in X_test:
             distances = np.sqrt(np.sum((self.X_train - x) ** 2, 1))

@@ -5,14 +5,34 @@ from sklearn.metrics import r2_score, mean_squared_error
 from sklearn.neighbors import KNeighborsRegressor
 
 class KNNRegressor:
-    def __init__(self, k: int = 2):
+    """
+    KNN Regression class
+    methods: constructor, fit, predict
+    """
+    def __init__(self, k: int = 2) -> None:
+
         self.k = k
 
-    def fit(self, X, y):
+    def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Fit saves training data for KNN without training phase (lazy learning)
+        :param X: training samples, shape (n_samples, n_features)
+        :param y: target labels, shape (n_samples,)
+        :return: None
+        """
         self.X_train = X
         self.y_train = y
 
-    def predict(self, X_test):
+    def predict(self, X_test: np.ndarray) -> np.ndarray:
+        """
+        Predict method
+        For each test sample:
+        - compute Euclidean distances to all training samples
+        - select k nearest neighbors
+        - take the mean of their target values as the prediction
+        :param X_test: test samples, shape (n_samples, n_features)
+        :return: predicted values as np.ndarray
+        """
         predictions = []
         for x in X_test:
             distances = np.sqrt(np.sum((self.X_train - x) ** 2, 1))
