@@ -6,7 +6,14 @@ from sklearn.naive_bayes import BernoulliNB
 
 
 class BernoulliNaiveBayes:
-    def fit(self, X, y):
+    """
+    Bernoulli Naive Bayes Classifier
+
+    Methods:
+    - fit(X, y): train the model by estimating probabilities.
+    - predict(X): predict class labels for new samples.
+    """
+    def fit(self, X: np.ndarray, y: np.ndarray) -> None:
         self.classes = np.unique(y)
         n_samples, n_features = X.shape
 
@@ -20,7 +27,13 @@ class BernoulliNaiveBayes:
             self.feature_log_prob[c] = np.log(feature_prob)
             self.feature_log_prob[f"{c}_neg"] = np.log(1 - feature_prob)
 
-    def predict(self, X):
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class labels for test samples using the KNN algorithm.
+
+        :param X_test: test samples, shape (n_samples, n_features)
+        :return: predicted class labels, shape (n_samples,)
+        """
         y_pred = []
         for x in X:
             posteriors = []

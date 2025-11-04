@@ -5,7 +5,22 @@ from sklearn.metrics import accuracy_score
 from sklearn.naive_bayes import GaussianNB
 
 class GaussianNaiveBayes:
-    def fit(self, X, y):
+    """
+    Gaussian Naive Bayes classifier implementation.
+    Uses Gaussian (Normal) distribution to model continuous features.
+    Methods:
+    - fit: calculate mean, variance, and priors for each class
+    - _gaussian_pdf: compute probability density for a given feature
+    - predict: classify new samples based on posterior probabilities
+    """
+
+    def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Fit the Gaussian Naive Bayes model.
+        :param X: training data, shape (n_samples, n_features)
+        :param y: target labels, shape (n_samples,)
+        :return: None
+        """
         self.classes = np.unique(y)
         self.mean = {}
         self.var = {}
@@ -17,14 +32,25 @@ class GaussianNaiveBayes:
             self.var[c] = X_c.var(axis=0) + 1e-6
             self.priors[c] = X_c.shape[0] / X.shape[0]
 
-    def _gaussian_pdf(self, class_idx: int, x):
+    def _gaussian_pdf(self, class_idx: int, x) -> np.ndarray:
+        """
+        Compute Gaussian probability density function for each feature.
+        :param class_idx: class label
+        :param x: input sample (1D array of features)
+        :return: array of probability densities for each feature
+        """
         mean_ = self.mean[class_idx]
         var_ = self.var[class_idx]
         numerator = np.exp(-((x - mean_) ** 2) / (2 * var_))
         denominator = np.sqrt(2 * np.pi * var_)
         return numerator / denominator
 
-    def predict(self, X):
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class labels for input samples.
+        :param X: test data, shape (n_samples, n_features)
+        :return: predicted class labels, shape (n_samples,)
+        """
         y_pred = []
         for x in X:
             posteriors = []

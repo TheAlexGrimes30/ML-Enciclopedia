@@ -6,7 +6,20 @@ from sklearn.naive_bayes import MultinomialNB
 
 
 class MultinomialNaiveBayes:
-    def fit(self, X, y):
+    """
+    Multinomial Naive Bayes Classifier
+    Methods:
+    - fit: learn class priors and feature probabilities
+    - predict: predict class labels for new samples
+    """
+
+    def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Fit the Multinomial Naive Bayes model
+        :param X: training samples, shape (n_samples, n_features), discrete counts
+        :param y: target labels, shape (n_samples,)
+        :return: None
+        """
         self.classes = np.unique(y)
         self.class_count = {c: np.sum(y == c) for c in self.classes}
         self.feature_count = {c: np.sum(X[y == c], 0) for c in self.classes}
@@ -18,7 +31,12 @@ class MultinomialNaiveBayes:
             self.feature_log_prob[c] = np.log(smoothed)
             self.class_log_prior[c] = np.log(self.class_count[c] / X.shape[0])
 
-    def predict(self, X):
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class labels for input samples
+        :param X: test samples, shape (n_samples, n_features)
+        :return: predicted labels, shape (n_samples,)
+        """
         y_pred = []
         for x in X:
             posteriors = []
