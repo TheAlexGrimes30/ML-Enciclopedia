@@ -9,7 +9,7 @@ class KNNClassifier:
     KNN Classifier class
     methods: constructor, fit, predict
     """
-    def __init__(self, k: int = 3) -> None:
+    def __init__(self, k: int = 3):
         """
         Constructor
         :param k: number of neighbours

@@ -6,6 +6,15 @@ from sklearn.model_selection import train_test_split
 
 
 class LinearRegressionCustom:
+    """
+    Custom Linear Regression class with optional regularization.
+
+    Methods:
+    - constructor
+    - fit
+    - predict
+    """
+
     def __init__(self,
                  lr: float = 0.1,
                  n_iters: int = 1000,
@@ -13,13 +22,32 @@ class LinearRegressionCustom:
                  alpha: float = 0.1,
                  l1_ratio: float = 0.5
                  ):
+        """
+        Constructor
+
+        :param lr: learning rate
+        :param n_iters: number of iterations for gradient descent
+        :param regularization: type of regularization ("l1", "l2", "elasticnet") or None
+        :param alpha: regularization strength
+        :param l1_ratio: balance between L1 and L2 in ElasticNet
+        :return: None
+        """
+
         self.lr = lr
         self.n_iters = n_iters
         self.regularization = regularization
         self.alpha = alpha
         self.l1_ratio = l1_ratio
 
-    def fit(self, X, y):
+    def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Fit linear model to training data using gradient descent
+
+        :param X: training samples, shape (n_samples, n_features)
+        :param y: target values, shape (n_samples,)
+        :return: None
+        """
+
         m, n = X.shape
         self.w = np.zeros(n)
         self.b = 0
@@ -41,7 +69,14 @@ class LinearRegressionCustom:
             self.w -= self.lr * dw
             self.b -= self.lr * db
 
-    def predict(self, X):
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict target values for given input samples
+
+        :param X: input samples, shape (n_samples, n_features)
+        :return: predicted values, shape (n_samples,)
+        """
+
         return np.dot(X, self.w) + self.b
 
 X, y = make_regression(n_samples=200, n_features=3, noise=10, random_state=42)

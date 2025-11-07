@@ -9,7 +9,13 @@ class KNNRegressor:
     KNN Regression class
     methods: constructor, fit, predict
     """
-    def __init__(self, k: int = 2) -> None:
+
+    def __init__(self, k: int = 2):
+        """
+        Constructor
+        :param k: number of neighbours
+        :return: None
+        """
 
         self.k = k
 
