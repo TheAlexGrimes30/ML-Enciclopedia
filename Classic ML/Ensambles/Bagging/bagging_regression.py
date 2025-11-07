@@ -7,23 +7,61 @@ from sklearn.tree import DecisionTreeRegressor
 
 
 class Node:
-    def __init__(self, feature=None, threshold=None, left=None, right=None, value=None):
+    """
+    Node class for Decision Tree structure
+    A node may represent either:
+    - internal node: defined by feature & threshold, with left and right children
+    - leaf node: defined only by value
+    """
+
+    def __init__(self, feature: Optional[int] = None, threshold: Optional[floating] = None,
+                 left: Optional["Node"] = None, right: Optional["Node"] = None,
+                 value: Optional[Union[int, float]] = None):
+        """
+        Constructor
+        :param feature: index of feature used for split
+        :param threshold: threshold value for split
+        :param left: left child node
+        :param right: right child node
+        :param value: predicted class for leaf node
+        :return: None
+        """
+
         self.feature = feature
         self.threshold = threshold
         self.left = left
         self.right = right
         self.value = value
 
+
 class DecisionTreeRegressorCustom:
+    """
+    Custom Decision Tree Regressor implementation (CART algorithm)
+    Uses MSE (mean squared error) to evaluate splits.
+    """
+
     def __init__(self, max_depth: int = 5, min_samples_split: int = 2):
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.root = None
 
-    def _mse(self, y):
+    def _mse(self, y: np.ndarray) -> floating:
+        """
+        Computes Mean Squared Error (impurity measure for regression)
+        :param y: target values
+        :return: MSE value
+        """
+
         return np.mean((y - np.mean(y)) ** 2)
 
-    def _best_split(self, X, y):
+    def _best_split(self, X: np.ndarray, y: np.ndarray) -> Tuple[Optional[int], Optional[float], float]:
+        """
+        Finds the best feature and threshold to split data minimizing MSE
+        :param X: features matrix (n_samples, n_features)
+        :param y: target values (n_samples,)
+        :return: (best_feature_index, best_threshold_value, best_gain)
+        """
+
         best_gain = 0
         best_feat, best_thresh = 0, 0
         current_mse = self._mse(y)
@@ -49,7 +87,15 @@ class DecisionTreeRegressorCustom:
 
         return best_feat, best_thresh, best_gain
 
-    def _build_tree(self, X, y, depth: int = 0):
+    def _build_tree(self, X: np.ndarray, y: np.ndarray, depth: int = 0) -> Node:
+        """
+        Recursively builds decision tree
+        :param X: features matrix
+        :param y: target values
+        :param depth: current depth of recursion
+        :return: Node object (leaf or internal)
+        """
+
         if depth >= self.max_depth or len(y) < self.min_samples_split or len(np.unique(y)) == 1:
             return Node(value=np.mean(y))
 
@@ -65,10 +111,24 @@ class DecisionTreeRegressorCustom:
 
         return Node(feature=feat, threshold=thresh, left=left, right=right)
 
-    def fit(self, X, y):
+    def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Fits the Decision Tree model to training data
+        :param X: training features
+        :param y: training target values
+        :return: None
+        """
+
         self.root = self._build_tree(X, y)
 
-    def _predict_one(self, x, node: Node):
+    def _predict_one(self, x: np.ndarray, node: Node) -> int | float | None:
+        """
+        Predicts value for a single sample
+        :param x: feature vector
+        :param node: current node
+        :return: predicted continuous value
+        """
+
         if node.value is not None:
             return node.value
 
@@ -77,17 +137,49 @@ class DecisionTreeRegressorCustom:
         else:
             return self._predict_one(x, node.right)
 
-    def predict(self, X):
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predicts values for dataset
+        :param X: features matrix
+        :return: predicted values (n_samples,)
+        """
+
         return np.array([self._predict_one(x, self.root) for x in X])
 
 class BaggingRegressorCustom:
+    """
+    Bagging Regressor implementation.
+    This ensemble method trains multiple base regressors on different
+    bootstrap samples and combines their predictions by averaging.
+    """
+
     def __init__(self, base_estimator: DecisionTreeRegressorCustom, n_estimators: int = 10):
+        """
+        Constructor
+        :param base_estimator: base regressor class (not an instance), e.g., DecisionTreeRegressorCustom
+        :param n_estimators: number of regressors to train in the ensemble
+        :return: None
+        """
+
         self.base_estimator = base_estimator
         self.n_estimators = n_estimators
         self.models = []
         self.oob_indices = []
 
-    def fit(self, X, y):
+    def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Train the ensemble using bootstrap sampling.
+
+        For each estimator:
+        - Sample training data with replacement (bootstrap)
+        - Track Out-Of-Bag (OOB) samples (those not selected in bootstrap)
+        - Train a new base estimator on the bootstrap sample
+
+        :param X: feature matrix, shape (n_samples, n_features)
+        :param y: target vector, shape (n_samples,)
+        :return: None
+        """
+
         n_samples = X.shape[0]
         self.models = []
         self.oob_indices = []
@@ -104,11 +196,29 @@ class BaggingRegressorCustom:
             self.models.append(model)
             self.oob_indices.append(oob_idx)
 
-    def predict(self, X):
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict target values using average of all estimators.
+
+        :param X: feature matrix to predict on
+        :return: numpy array of predicted target values
+        """
+
         preds = np.array([model.predict(X) for model in self.models])
         return np.mean(preds, axis=0)
 
-    def oob_score(self, X, y):
+    def oob_score(self, X: np.ndarray, y: np.ndarray) -> float:
+        """
+        Compute Out-Of-Bag (OOB) R^2 score.
+
+        Each model predicts only on samples that were not used in its training.
+        The final prediction for each sample is the average of all OOB predictions.
+
+        :param X: feature matrix (full dataset)
+        :param y: true target values
+        :return: float OOB R^2 score
+        """
+
         n_samples = X.shape[0]
         oob_preds = np.zeros(n_samples)
         oob_counts = np.zeros(n_samples)

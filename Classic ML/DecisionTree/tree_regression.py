@@ -139,6 +139,12 @@ class DecisionTreeRegressorCustom:
             return self._predict_one(x, node.right)
 
     def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predicts values for dataset
+        :param X: features matrix
+        :return: predicted values (n_samples,)
+        """
+
         return np.array([self._predict_one(x, self.root) for x in X])
 
 
