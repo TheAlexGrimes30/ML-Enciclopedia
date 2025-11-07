@@ -1,3 +1,5 @@
+from typing import Tuple, Optional, Union
+
 import numpy as np
 from sklearn.datasets import make_regression
 from sklearn.ensemble import BaggingRegressor
@@ -14,7 +16,7 @@ class Node:
     - leaf node: defined only by value
     """
 
-    def __init__(self, feature: Optional[int] = None, threshold: Optional[floating] = None,
+    def __init__(self, feature: Optional[int] = None, threshold: Optional[np.floating] = None,
                  left: Optional["Node"] = None, right: Optional["Node"] = None,
                  value: Optional[Union[int, float]] = None):
         """
@@ -45,7 +47,7 @@ class DecisionTreeRegressorCustom:
         self.min_samples_split = min_samples_split
         self.root = None
 
-    def _mse(self, y: np.ndarray) -> floating:
+    def _mse(self, y: np.ndarray) -> np.floating:
         """
         Computes Mean Squared Error (impurity measure for regression)
         :param y: target values
