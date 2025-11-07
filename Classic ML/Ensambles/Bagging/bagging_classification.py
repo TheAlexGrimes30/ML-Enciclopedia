@@ -1,4 +1,5 @@
 from collections import Counter
+from typing import Union, Tuple, Optional
 
 import numpy as np
 from sklearn.datasets import make_classification
@@ -9,7 +10,26 @@ from sklearn.tree import DecisionTreeClassifier
 
 
 class Node:
-    def __init__(self, feature=None, threshold=None, left=None, right=None, value=None):
+    """
+    Node class for Decision Tree structure
+    A node may represent either:
+    - internal node: defined by feature & threshold, with left and right children
+    - leaf node: defined only by value
+    """
+
+    def __init__(self, feature: Optional[int] = None, threshold: Optional[float] = None,
+                 left: Optional["Node"] = None, right: Optional["Node"] = None,
+                 value: Optional[Union[int, float]] = None):
+        """
+        Constructor
+        :param feature: index of feature used for split
+        :param threshold: threshold value for split
+        :param left: left child node
+        :param right: right child node
+        :param value: predicted class for leaf node
+        :return: None
+        """
+
         self.feature = feature
         self.threshold = threshold
         self.left = left
@@ -17,13 +37,32 @@ class Node:
         self.value = value
 
 class DecisionTreeCustom:
+    """
+    Custom implementation of Decision Tree Classifier
+    methods: constructor, fit, predict
+    """
+
     def __init__(self, max_depth: int = 5, min_samples_split: int = 2, criterion: str = "gini"):
+        """
+        Constructor
+        :param max_depth: maximum depth of the tree
+        :param min_samples_split: minimum number of samples required to split a node
+        :param criterion: impurity criterion: "gini" or "entropy"
+        :return: None
+        """
+
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.criterion = criterion
         self.root = None
 
-    def _gini(self, y):
+    def _gini(self, y: np.ndarray) -> float:
+        """
+        Calculates Gini impurity
+        :param y: target class labels
+        :return: gini impurity value
+        """
+
         classes = np.unique(y)
         g = 1.0
         for c in classes:
@@ -31,7 +70,13 @@ class DecisionTreeCustom:
             g -= p ** 2
         return g
 
-    def _entropy(self, y):
+    def _entropy(self, y: np.ndarray) -> float:
+        """
+        Calculates entropy
+        :param y: target class labels
+        :return: entropy value
+        """
+
         classes = np.unique(y)
         h = 0.0
         for c in classes:
@@ -39,10 +84,23 @@ class DecisionTreeCustom:
             h -= p * np.log2(p + 1e-9)
         return h
 
-    def _impurity(self, y):
+    def _impurity(self, y: np.ndarray) -> float:
+        """
+        Select impurity function based on criterion
+        :param y: target labels
+        :return: impurity value
+        """
+
         return self._gini(y) if self.criterion == "gini" else self._entropy(y)
 
-    def _best_split(self, X, y):
+    def _best_split(self, X: np.ndarray, y: np.ndarray) -> Tuple[Optional[int], Optional[float], float]:
+        """
+        Finds best feature and threshold to split data
+        :param X: input features
+        :param y: target labels
+        :return: best feature index, threshold and gain
+        """
+
         best_gain = 0
         best_feat, best_thresh = None, None
         current_impurity = self._impurity(y)
@@ -70,7 +128,15 @@ class DecisionTreeCustom:
 
         return best_feat, best_thresh, best_gain
 
-    def _build_tree(self, X, y, depth: int = 0):
+    def _build_tree(self, X: np.ndarray, y: np.ndarray, depth: int = 0) -> Node:
+        """
+        Recursively builds the decision tree
+        :param X: feature matrix
+        :param y: target labels
+        :param depth: current depth of the tree
+        :return: Node
+        """
+
         if depth >= self.max_depth or len(y) < self.min_samples_split or len(np.unique(y)) == 1:
             leaf_value = Counter(y).most_common(1)[0][0]
             return Node(value=leaf_value)
@@ -89,10 +155,24 @@ class DecisionTreeCustom:
 
         return Node(feature=feat, threshold=thresh, left=left, right=right)
 
-    def fit(self, X, y):
+    def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Fit builds the decision tree from training data
+        :param X: training input features
+        :param y: training target labels
+        :return: None
+        """
+
         self.root = self._build_tree(X, y)
 
-    def _predict_one(self, x, node: Node):
+    def _predict_one(self, x: np.ndarray, node: Node) -> Union[int, float]:
+        """
+        Predicts class for a single sample
+        :param x: input sample (1D array)
+        :param node: current tree node
+        :return: predicted class label
+        """
+
         if node.value is not None:
             return node.value
 
@@ -101,17 +181,45 @@ class DecisionTreeCustom:
         else:
             return self._predict_one(x, node.right)
 
-    def predict(self, X):
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predicts class labels for dataset
+        :param X: input features (n_samples, n_features)
+        :return: predicted labels array
+        """
+
         return np.array([self._predict_one(x, self.root) for x in X])
 
 class BaggingClassifierCustom:
+    """
+    Bagging classifier implementation.
+
+    This ensemble method trains multiple base estimators on different
+    bootstrap samples and combines their predictions using majority voting.
+    """
+
     def __init__(self, base_estimator: DecisionTreeCustom, n_estimators: int = 10):
+        """
+        Constructor
+        :param base_estimator: base model class
+        :param n_estimators: number of models to train in the ensemble
+        :return: None
+        """
+
         self.base_estimator = base_estimator
         self.n_estimators = n_estimators
         self.models = []
         self.oob_indices = []
 
-    def fit(self, X, y):
+    def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Train the ensemble using bootstrap sampling.
+
+        :param X: feature matrix, shape (n_samples, n_features)
+        :param y: label vector, shape (n_samples,)
+        :return: None
+        """
+
         n_samples = X.shape[0]
         self.models = []
         self.oob_indices = []
@@ -125,14 +233,28 @@ class BaggingClassifierCustom:
             self.models.append(model)
             self.oob_indices.append(oob_idx)
 
-    def predict(self, X):
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class labels using majority voting.
+
+        :param X: feature matrix to predict on
+        :return: numpy.ndarray of predicted class labels
+        """
+
         preds = np.array([model.predict(X) for model in self.models])
         final_preds = []
         for col in preds.T:
             final_preds.append(Counter(col).most_common(1)[0][0])
         return np.array(final_preds)
 
-    def oob_score(self, X, y):
+    def oob_score(self, X: np.ndarray, y: np.ndarray) -> float:
+        """
+        Compute Out-Of-Bag (OOB) accuracy score.
+        :param X: full dataset feature matrix
+        :param y: true labels
+        :return: float OOB accuracy score
+        """
+
         n_samples = X.shape[0]
         votes = [[] for _ in range(n_samples)]
 
