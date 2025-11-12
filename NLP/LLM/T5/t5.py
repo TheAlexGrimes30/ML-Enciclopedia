@@ -585,4 +585,3 @@ if __name__ == "__main__":
                 bleu = sentence_bleu([ref], cand, smoothing_function=smooth_fn)
                 bleu_scores.append(bleu)
     print("Avg BLEU (toy):", sum(bleu_scores) / len(bleu_scores))
-    
