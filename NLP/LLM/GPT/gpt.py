@@ -351,7 +351,8 @@ if __name__ == "__main__":
         for s, t in loader:
             s = s.to(device)
             t = t.to(device)
-            decoder_input = torch.cat([torch.full((t.size(0), 1), start, dtype=torch.long, device=device), t[:, :-1]],
+            decoder_input = torch.cat([torch.full((t.size(0), 1), start,
+                                                  dtype=torch.long, device=device), t[:, :-1]],
                                       dim=1)
             logits = model(decoder_input)
             loss = criterion(logits.view(-1, vocab_size), t.view(-1))
@@ -368,7 +369,8 @@ if __name__ == "__main__":
         for s, t in loader:
             s = s.to(device)
             t = t.to(device)
-            gen = model.generate(torch.full((t.size(0), 1), start, dtype=torch.long, device=device), max_len=seq_len)
+            gen = model.generate(torch.full((t.size(0), 1), start,
+                                            dtype=torch.long, device=device), max_len=seq_len)
             gen = gen[:, :seq_len].cpu().tolist()
             for i in range(t.size(0)):
                 ref = [str(tok.item()) for tok in t[i]]
