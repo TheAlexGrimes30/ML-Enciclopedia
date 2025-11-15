@@ -405,7 +405,6 @@ if __name__ == "__main__":
 
         print(f"Epoch {epoch + 1} Loss: {total_loss / len(loader):.4f}")
 
-    # Evaluation
     model.eval()
     correct = 0
     with torch.no_grad():
