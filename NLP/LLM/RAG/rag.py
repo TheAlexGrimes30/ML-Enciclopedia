@@ -458,6 +458,6 @@ if __name__ == "__main__":
     queries = torch.randint(1, vocab_size, (3, seq_len), device=device)
 
     generated_tokens = rag(queries, max_len=20, top_k_docs=2)
-    
+
     print("Generated tokens:")
     print(generated_tokens)
