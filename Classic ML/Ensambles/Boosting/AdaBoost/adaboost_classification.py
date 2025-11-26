@@ -143,7 +143,7 @@ class DecisionTreeCustom:
         feat, thresh, gain = self._best_split(X, y)
 
         if gain == 0:
-            leaf_value = Counter().most_common(1)[0][0]
+            leaf_value = Counter(y).most_common(1)[0][0]
             return Node(value=leaf_value)
 
         left_mask = X[:, feat] <= thresh
