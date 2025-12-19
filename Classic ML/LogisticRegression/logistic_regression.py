@@ -6,6 +6,20 @@ from sklearn.model_selection import train_test_split
 
 
 class LogisticRegressionCustom:
+    """
+    Logistic Regression with support for
+    different optimization solvers and regularization techniques.
+
+    Supported solvers:
+    - Gradient Descent (gd)
+    - Stochastic Average Gradient (sag)
+    - Newton-CG (newton-cg)
+
+    Supported regularization:
+    - L1
+    - L2
+    - ElasticNet
+    """
     def __init__(self, lr: float = 0.01,
                  n_iters: int = 1000,
                  regularization: str = None,
@@ -13,6 +27,25 @@ class LogisticRegressionCustom:
                  l1_ratio: float = 0.5,
                  solver: str = "gd"
                  ):
+        """
+        Constructor of Logistic Regression model.
+
+        Parameters
+        ----------
+        lr : float
+            Learning rate for optimization.
+        n_iters : int
+            Number of training iterations.
+        regularization : str or None
+            Type of regularization ('l1', 'l2', 'elasticnet' or None).
+        alpha : float
+            Regularization strength.
+        l1_ratio : float
+            Ratio between L1 and L2 penalties for ElasticNet.
+        solver : str
+            Optimization algorithm ('gd', 'sag', 'newton-cg').
+        """
+
         self.lr = lr
         self.n_iters = n_iters
         self.regularization = regularization
@@ -22,14 +55,58 @@ class LogisticRegressionCustom:
         self.b = 0
         self.solver = solver
 
-    def _sigmoid(self, z):
+    def _sigmoid(self, z: np.ndarray) -> np.ndarray:
+        """
+        Compute the sigmoid activation function.
+
+        Parameters
+        ----------
+        z : np.ndarray
+            Linear combination of features and weights.
+
+        Returns
+        -------
+        np.ndarray
+            Sigmoid-transformed values.
+        """
+
         return 1 / (1 + np.exp(-z))
 
-    def _loss(self, X, y):
+    def _loss(self, X: np.ndarray, y: np.ndarray) -> float:
+        """
+        Compute logistic loss (binary cross-entropy).
+
+        Parameters
+        ----------
+        X : np.ndarray
+            Feature matrix of shape (n_samples, n_features).
+        y : np.ndarray
+            Target labels of shape (n_samples,).
+
+        Returns
+        -------
+        float
+            Mean logistic loss value.
+        """
+
         y_pred = self._sigmoid(np.dot(X, self.w) + self.b)
         return -np.mean(y * np.log(y_pred + 1e-9) + (1 - y) * np.log(1 - y_pred + 1e-9))
 
-    def _add_regularization(self, dw):
+    def _add_regularization(self, dw: np.ndarray) -> np.ndarray:
+        """
+        Apply regularization term to the gradient.
+
+        Parameters
+        ----------
+        dw : np.ndarray
+            Gradient of the loss with respect to weights.
+
+        Returns
+        -------
+        np.ndarray
+            Regularized gradient.
+        """
+
         if self.regularization == "l2":
             dw += (self.alpha) * self.w
 
@@ -41,7 +118,22 @@ class LogisticRegressionCustom:
 
         return dw
 
-    def fit(self, X, y):
+    def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Train the logistic regression model.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            Training feature matrix of shape (n_samples, n_features).
+        y : np.ndarray
+            Training labels of shape (n_samples,).
+
+        Returns
+        -------
+        None
+        """
+
         n_samples, n_features = X.shape
         self.w = np.zeros(n_features)
 
@@ -78,10 +170,38 @@ class LogisticRegressionCustom:
                 self.w -= dw
                 self.b -= np.mean(y_pred - y)
 
-    def predict_proba(self, X):
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class probabilities.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            Feature matrix of shape (n_samples, n_features).
+
+        Returns
+        -------
+        np.ndarray
+            Predicted probabilities for class 1.
+        """
+
         return self._sigmoid(np.dot(X, self.w) + self.b)
 
-    def predict(self, X):
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict binary class labels.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            Feature matrix of shape (n_samples, n_features).
+
+        Returns
+        -------
+        np.ndarray
+            Predicted class labels (0 or 1).
+        """
+
         return np.where(self.predict_proba(X) >= 0.5, 1, 0)
 
 X, y = make_classification(n_samples=300, n_features=4, random_state=42)
