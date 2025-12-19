@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.datasets import make_classification
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import BernoulliNB
 
@@ -72,4 +72,13 @@ sk_bnb.fit(X_train, y_train)
 sk_y_pred = sk_bnb.predict(X_test)
 
 print("Custom BernoulliNB accuracy:", accuracy_score(y_test, my_y_pred))
+print("Custom BernoulliNB precision:", precision_score(y_test, my_y_pred))
+print("Custom BernoulliNB recall:", recall_score(y_test, my_y_pred))
+print("Custom BernoulliNB f1:", f1_score(y_test, my_y_pred))
+print("Custom BernoulliNB roc-auc:", roc_auc_score(y_test, my_y_pred))
+print()
 print("Sklearn BernoulliNB accuracy:", accuracy_score(y_test, sk_y_pred))
+print("Sklearn BernoulliNB precision:", precision_score(y_test, my_y_pred))
+print("Sklearn BernoulliNB recall:", recall_score(y_test, my_y_pred))
+print("Sklearn BernoulliNB f1:", f1_score(y_test, my_y_pred))
+print("Sklearn BernoulliNB roc-auc:", roc_auc_score(y_test, my_y_pred))

@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.datasets import make_classification
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
 
@@ -38,7 +38,7 @@ class MultinomialNaiveBayes:
         :param X: test samples, shape (n_samples, n_features)
         :return: predicted labels, shape (n_samples,)
         """
-        
+
         y_pred = []
         for x in X:
             posteriors = []
@@ -66,4 +66,13 @@ sk_mnb.fit(X_train, y_train)
 sk_y_pred = sk_mnb.predict(X_test)
 
 print("Custom MultinomialNB accuracy:", accuracy_score(y_test, my_y_pred))
+print("Custom MultinomialNB precision:", precision_score(y_test, my_y_pred))
+print("Custom MultinomialNB recall:", recall_score(y_test, my_y_pred))
+print("Custom MultinomialNB f1:", f1_score(y_test, my_y_pred))
+print("Custom MultinomialNB roc-auc:", roc_auc_score(y_test, my_y_pred))
+print()
 print("Sklearn MultinomialNB accuracy:", accuracy_score(y_test, sk_y_pred))
+print("Sklearn MultinomialNB precision:", precision_score(y_test, my_y_pred))
+print("Sklearn MultinomialNB recall:", recall_score(y_test, my_y_pred))
+print("Sklearn MultinomialNB f1:", f1_score(y_test, my_y_pred))
+print("Sklearn MultinomialNB roc-auc:", roc_auc_score(y_test, my_y_pred))
