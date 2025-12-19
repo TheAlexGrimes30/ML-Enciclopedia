@@ -13,7 +13,15 @@ class BernoulliNaiveBayes:
     - fit(X, y): train the model by estimating probabilities.
     - predict(X): predict class labels for new samples.
     """
+
     def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Fit the Bernoulli Naive Bayes model.
+        :param X: training data, shape (n_samples, n_features)
+        :param y: target labels, shape (n_samples,)
+        :return: None
+        """
+
         self.classes = np.unique(y)
         n_samples, n_features = X.shape
 

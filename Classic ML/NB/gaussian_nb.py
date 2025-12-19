@@ -21,6 +21,7 @@ class GaussianNaiveBayes:
         :param y: target labels, shape (n_samples,)
         :return: None
         """
+
         self.classes = np.unique(y)
         self.mean = {}
         self.var = {}
@@ -39,6 +40,7 @@ class GaussianNaiveBayes:
         :param x: input sample (1D array of features)
         :return: array of probability densities for each feature
         """
+
         mean_ = self.mean[class_idx]
         var_ = self.var[class_idx]
         numerator = np.exp(-((x - mean_) ** 2) / (2 * var_))
@@ -51,6 +53,7 @@ class GaussianNaiveBayes:
         :param X: test data, shape (n_samples, n_features)
         :return: predicted class labels, shape (n_samples,)
         """
+
         y_pred = []
         for x in X:
             posteriors = []
