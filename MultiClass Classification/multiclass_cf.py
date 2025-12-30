@@ -5,7 +5,7 @@ from itertools import combinations
 import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, log_loss
+from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.multiclass import OneVsOneClassifier, OneVsRestClassifier
 
@@ -72,12 +72,6 @@ class CustomOneVsRest:
 
         return self.classes[np.argmax(probs, axis=1)]
 
-    def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        return np.column_stack([
-            self.models[c].predict_proba(X)
-            for c in self.classes
-        ])
-
 class CustomOneVsOne:
     def fit(self, X: np.ndarray, y: np.ndarray) -> None:
         self.classes = np.unique(y)
@@ -92,26 +86,6 @@ class CustomOneVsOne:
             model.fit(X_pair, y_pair)
             self.models[(c1, c2)] = model
 
-    def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        n_samples = X.shape[0]
-        n_classes = len(self.classes)
-
-        votes = np.zeros((n_samples, n_classes))
-        for (c1, c2), model in self.models.items():
-            proba_pair = model.predict_proba(X)
-
-            idx_c1 = np.where(self.classes == c1)[0][0]
-            idx_c2 = np.where(self.classes == c2)[0][0]
-
-            votes[:, idx_c1] += (1 - proba_pair)
-            votes[:, idx_c2] += proba_pair
-
-        row_sums = votes.sum(axis=1)
-        row_sums[row_sums == 0] = 1.0
-        proba = votes / row_sums[:, np.newaxis]
-
-        return proba
-
     def predict(self, X: np.ndarray) -> np.ndarray:
         predictions = []
 
@@ -125,7 +99,7 @@ class CustomOneVsOne:
         return np.array(predictions)
 
 def evaluate(model, X_train: np.ndarray, y_train: np.ndarray, X_test: np.ndarray,
-             y_test: np.ndarray, proba: bool = True):
+             y_test: np.ndarray):
 
     start = time.time()
     model.fit(X_train, y_train)
@@ -133,13 +107,6 @@ def evaluate(model, X_train: np.ndarray, y_train: np.ndarray, X_test: np.ndarray
 
     y_pred = model.predict(X_test)
     acc = accuracy_score(y_test, y_pred)
-
-    if proba:
-        y_proba = model.predict_proba(X_test)
-        loss = log_loss(y_test, y_proba)
-    else:
-        loss = None
-
     return acc, train_time
 
 results = {}
@@ -154,8 +121,7 @@ results["Custom OvR"] = evaluate(
 
 results["Sklearn OvO"] = evaluate(
     OneVsOneClassifier(LogisticRegression(max_iter=1000)),
-    X_train, y_train, X_test, y_test,
-    proba=False
+    X_train, y_train, X_test, y_test
 )
 
 results["Sklearn OvR"] = evaluate(
