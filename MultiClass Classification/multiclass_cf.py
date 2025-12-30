@@ -34,11 +34,35 @@ for cls, cnt in zip(unique, counts):
 print()
 
 class BinaryLogisticRegression:
+    """
+    Logistic regression class
+    """
+
     def __init__(self, lr: float = 0.1, n_iters: int = 1000):
+        """
+        Logistic Regression Constructor
+
+        Parameters
+            lr : float
+                Learning rate for gradient descent.
+            n_iters : int
+                Number of gradient descent iterations.
+        """
+
         self.lr = lr
         self.n_iters = n_iters
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Train the logistic regression model using gradient descent.
+
+        Parameters
+            X : np.ndarray
+                Training feature matrix of shape (n_samples, n_features).
+            y : np.ndarray
+                Binary target vector of shape (n_samples,).
+        """
+
         self.w = np.zeros(X.shape[1])
         self.b = 0
 
@@ -53,11 +77,37 @@ class BinaryLogisticRegression:
             self.b -= self.lr * db
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """
+        Compute predicted probabilities for input samples.
+
+        Parameters
+            X : np.ndarray
+                Feature matrix of shape (n_samples, n_features).
+
+        Returns
+            np.ndarray
+                Predicted probabilities for the positive class.
+        """
+
         linear = X @ self.w + self.b
         return 1 / (1 + np.exp(-linear))
 
 class CustomOneVsRest:
+    """
+    One-vs-Rest multiclass classification
+    """
+
     def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Train one binary classifier per class.
+
+        Parameters
+            X : np.ndarray
+                Training feature matrix.
+            y : np.ndarray
+                Multiclass target vector.
+        """
+
         self.classes = np.unique(y)
         self.models = {}
 
@@ -68,6 +118,18 @@ class CustomOneVsRest:
             self.models[c] = model
 
     def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class labels for input samples.
+
+        Parameters
+            X : np.ndarray
+                Feature matrix of shape (n_samples, n_features).
+
+        Returns
+            np.ndarray
+                Predicted class labels.
+        """
+
         probs = np.column_stack([
             self.models[c].predict_proba(X)
             for c in self.classes
@@ -76,7 +138,21 @@ class CustomOneVsRest:
         return self.classes[np.argmax(probs, axis=1)]
 
 class CustomOneVsOne:
+    """
+    One-vs-One multiclass classification
+    """
+
     def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Train a binary classifier for each pair of classes.
+
+        Parameters
+            X : np.ndarray
+                Training feature matrix.
+            y : np.ndarray
+                Multiclass target vector.
+        """
+
         self.classes = np.unique(y)
         self.models = {}
 
@@ -90,6 +166,18 @@ class CustomOneVsOne:
             self.models[(c1, c2)] = model
 
     def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class labels using majority voting over pairwise classifiers.
+
+        Parameters
+            X : np.ndarray
+                Feature matrix of shape (n_samples, n_features).
+
+        Returns
+            np.ndarray
+                Predicted class labels.
+        """
+
         predictions = []
 
         for x in X:
@@ -103,6 +191,25 @@ class CustomOneVsOne:
 
 def evaluate(model, X_train: np.ndarray, y_train: np.ndarray, X_test: np.ndarray,
              y_test: np.ndarray) -> Tuple[Dict[str, np.ndarray], float]:
+    """
+    Train a model, evaluate its performance, and measure training time.
+
+    Parameters
+        model
+            Classification model with fit and predict methods.
+        X_train : np.ndarray
+            Training feature matrix.
+        y_train : np.ndarray
+            Training target vector.
+        X_test : np.ndarray
+            Test feature matrix.
+        y_test : np.ndarray
+            Test target vector.
+
+    Returns
+        Tuple[Dict[str, np.ndarray], float]
+            Dictionary with evaluation metrics and training time.
+    """
 
     metrics = {}
     start = time.time()
