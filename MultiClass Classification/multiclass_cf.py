@@ -1,11 +1,12 @@
 import time
 from collections import Counter
 from itertools import combinations
+from typing import Tuple, Dict
 
 import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, precision_score, f1_score, recall_score
 from sklearn.model_selection import train_test_split
 from sklearn.multiclass import OneVsOneClassifier, OneVsRestClassifier
 
@@ -29,6 +30,8 @@ unique, counts = np.unique(y, return_counts=True)
 print("\nРаспределение классов во всей выборке:")
 for cls, cnt in zip(unique, counts):
     print(f"  Класс {cls}: {cnt} образцов ({cnt/len(y)*100:.1f}%)")
+
+print()
 
 class BinaryLogisticRegression:
     def __init__(self, lr: float = 0.1, n_iters: int = 1000):
@@ -99,15 +102,30 @@ class CustomOneVsOne:
         return np.array(predictions)
 
 def evaluate(model, X_train: np.ndarray, y_train: np.ndarray, X_test: np.ndarray,
-             y_test: np.ndarray):
+             y_test: np.ndarray) -> Tuple[Dict[str, np.ndarray], float]:
 
+    metrics = {}
     start = time.time()
     model.fit(X_train, y_train)
     train_time = time.time() - start
 
     y_pred = model.predict(X_test)
-    acc = accuracy_score(y_test, y_pred)
-    return acc, train_time
+    accuracy = accuracy_score(y_test, y_pred)
+    metrics["accuracy"] = accuracy
+
+    balanced_accuracy = balanced_accuracy_score(y_test, y_pred)
+    metrics["balanced_accuracy"] = balanced_accuracy
+
+    precision = precision_score(y_test, y_pred, average="weighted")
+    metrics["precision"] = precision
+
+    f1 = f1_score(y_test, y_pred, average="weighted")
+    metrics["f1"] = f1
+
+    recall = recall_score(y_test, y_pred, average="weighted")
+    metrics["recall"] = recall
+
+    return metrics, train_time
 
 results = {}
 
@@ -137,5 +155,12 @@ results["Multinomial LR"] = evaluate(
     X_train, y_train, X_test, y_test
 )
 
-for name, (acc, t) in results.items():
-    print(f"{name:<25} {acc:<12} {t:<12}")
+for name, (metrics, t) in results.items():
+    print(f"{name:<20}")
+    print(f"Time: {t:<20}")
+
+    for metric_name, metrics_value in metrics.items():
+        print(f"{metric_name}: {metrics_value:<20}")
+
+    print("=" * 50)
+    print()
