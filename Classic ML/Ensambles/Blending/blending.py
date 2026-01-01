@@ -106,7 +106,7 @@ def evaluate(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, np.ndarray]:
             - recall: Weighted recall score
             - f1: Weighted F1-score
     """
-    
+
     return {
         "accuracy": accuracy_score(y_true, y_pred),
         "balanced_accuracy": balanced_accuracy_score(y_true, y_pred),
