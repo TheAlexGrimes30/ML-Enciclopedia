@@ -55,12 +55,58 @@ for model in base_models.values():
     model.fit(X_train, y_train)
 
 def get_blending_features(models, X: np.ndarray) -> np.ndarray:
+    """
+    Generate meta-features for blending by concatenating class probability
+    predictions from multiple base models.
+
+    Each base model produces a probability distribution over classes for
+    each sample. These probability vectors are horizontally stacked to
+    form a new feature representation that is used as input for the
+    meta-model in the blending ensemble.
+
+    Parameters
+    models : dict
+        Dictionary of trained base models. Each model must implement
+        the `predict_proba` method.
+    X : np.ndarray
+        Feature matrix of shape (n_samples, n_features).
+
+    Returns
+        np.ndarray
+            Meta-feature matrix of shape (n_samples, n_classes * n_models),
+            where each block of features corresponds to class probabilities
+            predicted by one base model.
+    """
     return np.hstack([
         model.predict_proba(X)
         for model in models.values()
     ])
 
 def evaluate(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, np.ndarray]:
+    """
+    Compute classification performance metrics for model evaluation.
+
+    This function calculates a set of commonly used classification metrics
+    based on the true labels and the predicted labels. All metrics are
+    computed using a weighted averaging strategy to account for possible
+    class imbalance.
+
+    Parameters
+        y_true : np.ndarray
+            Ground truth class labels of shape (n_samples,).
+        y_pred : np.ndarray
+            Predicted class labels of shape (n_samples,).
+
+    Returns
+        Dict[str, np.ndarray]
+            Dictionary containing the following evaluation metrics:
+            - accuracy: Overall classification accuracy
+            - balanced_accuracy: Average recall obtained on each class
+            - precision: Weighted precision score
+            - recall: Weighted recall score
+            - f1: Weighted F1-score
+    """
+    
     return {
         "accuracy": accuracy_score(y_true, y_pred),
         "balanced_accuracy": balanced_accuracy_score(y_true, y_pred),
