@@ -38,17 +38,59 @@ meta_model = LogisticRegression(
 )
 
 class CustomStackingClassifier:
+    """
+    Stacking classifier using out-of-fold
+    predictions for meta-model training.
+
+    This class implements a two-level ensemble learning approach:
+    - Base models are trained using k-fold cross-validation.
+    - Out-of-fold probability predictions are used as meta-features.
+    - A meta-model is trained on these meta-features to produce
+    the final prediction.
+    """
+
     def __init__(self,
                  base_models: List[tuple],
                  meta_model,
                  n_folds: int = 5
     ):
+        """
+        CustomStackingClassifier Constructor.
+
+        Parameters
+            base_models : List[tuple]
+                List of tuples (name, model), where each model is a classifier
+                implementing the `fit` and `predict_proba` methods.
+            meta_model : object
+                Meta-classifier used to combine predictions of base models.
+                Must implement `fit` and `predict`.
+            n_folds : int, default=5
+                Number of folds used for Stratified K-Fold cross-validation.
+        """
 
         self.base_models = base_models
         self.meta_model = meta_model
         self.n_folds = n_folds
 
-    def fit(self, X: np.ndarray, y: np.ndarray):
+    def fit(self, X: np.ndarray, y: np.ndarray) -> "CustomStackingClassifier":
+        """
+        Train the stacking ensemble.
+
+        Base models are trained using Stratified K-Fold cross-validation.
+        Out-of-fold predicted class probabilities are collected and used
+        as training features for the meta-model.
+
+        Parameters
+            X : np.ndarray
+                Training feature matrix of shape (n_samples, n_features).
+            y : np.ndarray
+                Target labels of shape (n_samples,).
+
+        Returns
+            CustomStackingClassifier
+                Fitted instance of the stacking classifier.
+        """
+
         self.classes_ = np.unique(y)
         n_samples = X.shape[0]
         n_classes = len(self.classes_)
@@ -88,7 +130,23 @@ class CustomStackingClassifier:
 
         return self
 
-    def predict(self, X: np.ndarray):
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class labels for new samples using the trained stacking ensemble.
+
+        The method generates meta-features by concatenating probability
+        predictions from all fitted base models and passes them to the
+        meta-model to obtain final predictions.
+
+        Parameters
+            X : np.ndarray
+                Feature matrix of shape (n_samples, n_features).
+
+        Returns
+            np.ndarray
+                Predicted class labels of shape (n_samples,).
+        """
+
         meta_features = np.hstack([
             model.predict_proba(X)
             for model in self.fitted_base_models_
@@ -96,6 +154,29 @@ class CustomStackingClassifier:
         return self.meta_model.predict(meta_features)
 
 def evaluate(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, np.ndarray]:
+    """
+    Compute classification performance metrics.
+
+    This function evaluates a classifier by calculating commonly used
+    performance metrics with weighted averaging to account for class
+    imbalance.
+
+    Parameters
+        y_true : np.ndarray
+            Ground truth class labels of shape (n_samples,).
+        y_pred : np.ndarray
+            Predicted class labels of shape (n_samples,).
+
+    Returns
+        Dict[str, float]
+            Dictionary containing the following metrics:
+            - accuracy: Overall classification accuracy
+            - balanced_accuracy: Mean recall across classes
+            - precision: Weighted precision score
+            - recall: Weighted recall score
+            - f1: Weighted F1-score
+    """
+
     return {
         "accuracy": accuracy_score(y_true, y_pred),
         "balanced_accuracy": balanced_accuracy_score(y_true, y_pred),
