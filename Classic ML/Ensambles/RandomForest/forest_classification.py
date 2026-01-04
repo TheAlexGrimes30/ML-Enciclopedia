@@ -1,4 +1,5 @@
 from collections import Counter
+from typing import Optional, Union, Tuple
 
 import numpy as np
 from sklearn.datasets import make_classification
@@ -15,7 +16,7 @@ class Node:
     - leaf node: defined only by value
     """
 
-    def __init__(self, feature: Optional[int] = None, threshold: Optional[np.floating] = None,
+    def __init__(self, feature: Optional[int] = None, threshold: Optional[float] = None,
                  left: Optional["Node"] = None, right: Optional["Node"] = None,
                  value: Optional[Union[int, float]] = None):
         """
@@ -34,38 +35,74 @@ class Node:
         self.right = right
         self.value = value
 
-
-class DecisionTreeRegressorCustom:
+class DecisionTreeCustom:
     """
-    Custom Decision Tree Regressor implementation (CART algorithm)
-    Uses MSE (mean squared error) to evaluate splits.
+    Custom implementation of Decision Tree Classifier
+    methods: constructor, fit, predict
     """
 
-    def __init__(self, max_depth: int = 5, min_samples_split: int = 2):
+    def __init__(self, max_depth: int = 5, min_samples_split: int = 2, criterion: str = "gini"):
+        """
+        Constructor
+        :param max_depth: maximum depth of the tree
+        :param min_samples_split: minimum number of samples required to split a node
+        :param criterion: impurity criterion: "gini" or "entropy"
+        :return: None
+        """
+
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
+        self.criterion = criterion
         self.root = None
 
-    def _mse(self, y: np.ndarray) -> np.floating:
+    def _gini(self, y: np.ndarray) -> float:
         """
-        Computes Mean Squared Error (impurity measure for regression)
-        :param y: target values
-        :return: MSE value
+        Calculates Gini impurity
+        :param y: target class labels
+        :return: gini impurity value
         """
 
-        return np.mean((y - np.mean(y)) ** 2)
+        classes = np.unique(y)
+        g = 1.0
+        for c in classes:
+            p = np.sum(y == c) / len(y)
+            g -= p ** 2
+        return g
+
+    def _entropy(self, y: np.ndarray) -> float:
+        """
+        Calculates entropy
+        :param y: target class labels
+        :return: entropy value
+        """
+
+        classes = np.unique(y)
+        h = 0.0
+        for c in classes:
+            p = np.sum(y == c) / len(y)
+            h -= p * np.log2(p + 1e-9)
+        return h
+
+    def _impurity(self, y: np.ndarray) -> float:
+        """
+        Select impurity function based on criterion
+        :param y: target labels
+        :return: impurity value
+        """
+
+        return self._gini(y) if self.criterion == "gini" else self._entropy(y)
 
     def _best_split(self, X: np.ndarray, y: np.ndarray) -> Tuple[Optional[int], Optional[float], float]:
         """
-        Finds the best feature and threshold to split data minimizing MSE
-        :param X: features matrix (n_samples, n_features)
-        :param y: target values (n_samples,)
-        :return: (best_feature_index, best_threshold_value, best_gain)
+        Finds best feature and threshold to split data
+        :param X: input features
+        :param y: target labels
+        :return: best feature index, threshold and gain
         """
 
         best_gain = 0
-        best_feat, best_thresh = 0, 0
-        current_mse = self._mse(y)
+        best_feat, best_thresh = None, None
+        current_impurity = self._impurity(y)
         n_samples, n_features = X.shape
 
         for feat in range(n_features):
@@ -79,8 +116,10 @@ class DecisionTreeRegressorCustom:
                     continue
 
                 y_left, y_right = y[left_mask], y[right_mask]
+
                 p_left = len(y_left) / n_samples
-                gain = current_mse - (p_left * self._mse(y_left) + (1 - p_left) * self._mse(y_right))
+
+                gain = current_impurity - (p_left * self._impurity(y_left) + (1 - p_left) * self._impurity(y_right))
 
                 if gain > best_gain:
                     best_gain = gain
@@ -90,19 +129,22 @@ class DecisionTreeRegressorCustom:
 
     def _build_tree(self, X: np.ndarray, y: np.ndarray, depth: int = 0) -> Node:
         """
-        Recursively builds decision tree
-        :param X: features matrix
-        :param y: target values
-        :param depth: current depth of recursion
-        :return: Node object (leaf or internal)
+        Recursively builds the decision tree
+        :param X: feature matrix
+        :param y: target labels
+        :param depth: current depth of the tree
+        :return: Node
         """
 
         if depth >= self.max_depth or len(y) < self.min_samples_split or len(np.unique(y)) == 1:
-            return Node(value=np.mean(y))
+            leaf_value = Counter(y).most_common(1)[0][0]
+            return Node(value=leaf_value)
 
         feat, thresh, gain = self._best_split(X, y)
+
         if gain == 0:
-            return Node(value=np.mean(y))
+            leaf_value = Counter(y).most_common(1)[0][0]
+            return Node(value=leaf_value)
 
         left_mask = X[:, feat] <= thresh
         right_mask = ~left_mask
@@ -114,20 +156,20 @@ class DecisionTreeRegressorCustom:
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> None:
         """
-        Fits the Decision Tree model to training data
-        :param X: training features
-        :param y: training target values
+        Fit builds the decision tree from training data
+        :param X: training input features
+        :param y: training target labels
         :return: None
         """
 
         self.root = self._build_tree(X, y)
 
-    def _predict_one(self, x: np.ndarray, node: Node) -> int | float | None:
+    def _predict_one(self, x: np.ndarray, node: Node) -> Union[int, float]:
         """
-        Predicts value for a single sample
-        :param x: feature vector
-        :param node: current node
-        :return: predicted continuous value
+        Predicts class for a single sample
+        :param x: input sample (1D array)
+        :param node: current tree node
+        :return: predicted class label
         """
 
         if node.value is not None:
@@ -140,9 +182,9 @@ class DecisionTreeRegressorCustom:
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """
-        Predicts values for dataset
-        :param X: features matrix
-        :return: predicted values (n_samples,)
+        Predicts class labels for dataset
+        :param X: input features (n_samples, n_features)
+        :return: predicted labels array
         """
 
         return np.array([self._predict_one(x, self.root) for x in X])
