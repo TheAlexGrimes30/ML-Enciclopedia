@@ -1,6 +1,7 @@
 from typing import Dict
 
 import numpy as np
+from sklearn.base import ClassifierMixin
 from sklearn.datasets import make_classification
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -54,7 +55,7 @@ base_models = {
 for model in base_models.values():
     model.fit(X_train, y_train)
 
-def get_blending_features(models, X: np.ndarray) -> np.ndarray:
+def get_blending_features(models: Dict[str, ClassifierMixin], X: np.ndarray) -> np.ndarray:
     """
     Generate meta-features for blending by concatenating class probability
     predictions from multiple base models.
@@ -82,7 +83,7 @@ def get_blending_features(models, X: np.ndarray) -> np.ndarray:
         for model in models.values()
     ])
 
-def evaluate(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, np.ndarray]:
+def evaluate(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
     """
     Compute classification performance metrics for model evaluation.
 
