@@ -1,7 +1,6 @@
 import heapq
 
 import numpy as np
-from networkx.classes import neighbors
 from sklearn.datasets import make_classification
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split

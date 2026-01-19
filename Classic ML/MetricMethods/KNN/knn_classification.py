@@ -9,12 +9,14 @@ class KNNClassifier:
     KNN Classifier class
     methods: constructor, fit, predict
     """
+
     def __init__(self, k: int = 3):
         """
         Constructor
         :param k: number of neighbours
         :return: None
         """
+
         self.k = k
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> None:
@@ -24,6 +26,7 @@ class KNNClassifier:
         :param y: target labels, shape (n_samples,)
         :return: None
         """
+
         self.X_train = X
         self.y_train = y
 
@@ -37,6 +40,7 @@ class KNNClassifier:
         :param X_test: test samples, shape (n_samples, n_features)
         :return: predicted labels as np.ndarray
         """
+
         predictions = []
         for x in X_test:
             distances = np.sqrt(np.sum((self.X_train - x) ** 2, 1))

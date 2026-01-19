@@ -26,6 +26,7 @@ class KNNRegressor:
         :param y: target labels, shape (n_samples,)
         :return: None
         """
+
         self.X_train = X
         self.y_train = y
 
@@ -39,6 +40,7 @@ class KNNRegressor:
         :param X_test: test samples, shape (n_samples, n_features)
         :return: predicted values as np.ndarray
         """
+
         predictions = []
         for x in X_test:
             distances = np.sqrt(np.sum((self.X_train - x) ** 2, 1))

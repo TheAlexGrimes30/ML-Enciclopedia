@@ -14,6 +14,7 @@ class CustomRNN(nn.Module):
     - hidden_size: Number of hidden units in the RNN.
     - bidirectional: Whether to use a bidirectional RNN.
     """
+
     def __init__(self, input_size: int, hidden_size: int, bidirectional: bool = False) -> None:
         """
         Constructor
@@ -22,6 +23,7 @@ class CustomRNN(nn.Module):
         :param bidirectional: Whether to use bidirectional RNN
         :return: None
         """
+
         super().__init__()
         self.hidden_size = hidden_size
         self.bidirectional = bidirectional
@@ -44,6 +46,7 @@ class CustomRNN(nn.Module):
         sequence_output: Hidden states for all timesteps (batch_size, seq_len, hidden_size * num_directions)
         last_hidden: Hidden state for last timestep (batch_size, hidden_size * num_directions)
         """
+
         batch_size, seq_len, _ = x.size()
         h_f = torch.zeros(batch_size, self.hidden_size, device=x.device)
         outputs_f = []
@@ -73,6 +76,7 @@ class RNNModel(nn.Module):
     """
     Simple RNN model combining CustomRNN and a linear output layer
     """
+
     def __init__(self, input_size: int = 1, hidden_size: int = 10, bidirectional: bool =False) -> None:
         """
         Constructor
@@ -81,6 +85,7 @@ class RNNModel(nn.Module):
         :param bidirectional: Whether to use bidirectional RNN
         :return: None
         """
+
         super().__init__()
         self.rnn = CustomRNN(input_size, hidden_size, bidirectional=bidirectional)
         self.linear = nn.Linear(hidden_size * (2 if bidirectional else 1), 1)
@@ -91,6 +96,7 @@ class RNNModel(nn.Module):
         :param x: Input tensor (batch_size, seq_len, input_size)
         :return: Output tensor (batch_size, seq_len, 1)
         """
+
         out_seq, _ = self.rnn(x)
         out = self.linear(out_seq)
         return out
@@ -102,6 +108,7 @@ def generate_sine_sequences(seq_len: int =10, n_samples: int = 1000) -> Tuple[to
     :param n_samples: Number of sequences to generate
     :return: Tuple of X (inputs) and y (targets)
     """
+
     X, y = [], []
     for _ in range(n_samples):
         start = np.random.rand() * 2 * np.pi
@@ -132,6 +139,7 @@ def train_torch_rnn(rnn: nn.RNN, linear: nn.Linear, X: torch.Tensor, y: torch.Te
     :param lr: Learning rate
     :return: Trained model
     """
+
     optimizer = optim.Adam(list(rnn.parameters()) + list(linear.parameters()), lr=lr)
     criterion = nn.MSELoss()
     for _ in trange(epochs, desc="Training torch.RNN"):
@@ -151,6 +159,7 @@ def evaluate(model: nn.Module, X: torch.Tensor, y: torch.Tensor) -> float:
     :param y: Target tensor
     :return: MSE loss value
     """
+
     with torch.no_grad():
         pred = model(X)
         return nn.MSELoss()(pred, y).item()
