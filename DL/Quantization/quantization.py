@@ -8,6 +8,16 @@ import torch.ao.quantization as tq
 from tqdm import trange
 
 def generate_data(n_samples: int = 2000) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Generate a synthetic 2D classification dataset.
+
+    Args:
+        n_samples (int): Number of samples to generate.
+
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor]: Features X and labels y.
+    """
+
     X = torch.randn(n_samples, 2)
     y = (X[:, 0] ** 2 + X[:, 1] > 1).long()
     return X, y
@@ -16,6 +26,13 @@ X_train, y_train = generate_data(1000)
 X_test, y_test = generate_data(300)
 
 class FP32Net(nn.Module):
+    """
+    Standard FP32 neural network with 2 hidden layers for classification.
+
+    Architecture:
+        Input -> Linear(2,32) -> ReLU -> Linear(32,32) -> ReLU -> Linear(32,2) -> Output
+    """
+
     def __init__(self):
         super().__init__()
         self.net = nn.Sequential(
@@ -27,9 +44,26 @@ class FP32Net(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the FP32 model.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, 2).
+
+        Returns:
+            torch.Tensor: Logits tensor of shape (batch_size, 2).
+        """
+
         return self.net(x)
 
 class QuantNet(nn.Module):
+    """
+    Neural network prepared for quantization using QuantStub and DeQuantStub.
+
+    Architecture:
+        QuantStub -> Linear(2,32) -> ReLU -> Linear(32,32) -> ReLU -> Linear(32,2) -> DeQuantStub
+    """
+
     def __init__(self):
         super().__init__()
         self.quant = tq.QuantStub()
@@ -43,12 +77,33 @@ class QuantNet(nn.Module):
         self.dequant = tq.DeQuantStub()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the quantizable model.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, 2).
+
+        Returns:
+            torch.Tensor: Logits tensor of shape (batch_size, 2).
+        """
+
         x = self.quant(x)
         x = self.net(x)
         x = self.dequant(x)
         return x
 
 def train_model(model: nn.Module, X: torch.Tensor, y: torch.Tensor, epochs: int = 50, lr: float = 1e-3) -> None:
+    """
+    Train a PyTorch model using Adam optimizer and cross-entropy loss.
+
+    Args:
+        model (nn.Module): PyTorch model to train.
+        X (torch.Tensor): Training features.
+        y (torch.Tensor): Training labels.
+        epochs (int): Number of training epochs.
+        lr (float): Learning rate for Adam optimizer.
+    """
+
     optimizer = optim.Adam(model.parameters(), lr=lr)
     pbar = trange(epochs, desc="Training")
     for epoch in pbar:
@@ -61,6 +116,18 @@ def train_model(model: nn.Module, X: torch.Tensor, y: torch.Tensor, epochs: int 
         pbar.write(f"Epoch {epoch + 1:02d} | Loss: {loss.item():.4f}")
 
 def evaluate(model: nn.Module, X: torch.Tensor, y: torch.Tensor) -> float:
+    """
+    Evaluate the accuracy of a model.
+
+    Args:
+        model (nn.Module): PyTorch model to evaluate.
+        X (torch.Tensor): Features for evaluation.
+        y (torch.Tensor): True labels.
+
+    Returns:
+        float: Accuracy in percentage.
+    """
+
     model.eval()
     with torch.no_grad():
         pred = model(X).argmax(1)
@@ -68,6 +135,18 @@ def evaluate(model: nn.Module, X: torch.Tensor, y: torch.Tensor) -> float:
     return acc
 
 def benchmark(model: nn.Module, X: torch.Tensor, runs: int = 100) -> float:
+    """
+    Measure the average inference time per forward pass.
+
+    Args:
+        model (nn.Module): PyTorch model to benchmark.
+        X (torch.Tensor): Input tensor for inference.
+        runs (int): Number of runs to average timing.
+
+    Returns:
+        float: Average inference time in seconds.
+    """
+    
     model.eval()
     with torch.no_grad():
         for _ in range(10):
