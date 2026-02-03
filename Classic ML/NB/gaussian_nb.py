@@ -33,7 +33,7 @@ class GaussianNaiveBayes:
             self.var[c] = X_c.var(axis=0) + 1e-6
             self.priors[c] = X_c.shape[0] / X.shape[0]
 
-    def _gaussian_pdf(self, class_idx: int, x) -> np.ndarray:
+    def _gaussian_pdf(self, class_idx: int, x: np.ndarray) -> np.ndarray:
         """
         Compute Gaussian probability density function for each feature.
         :param class_idx: class label
