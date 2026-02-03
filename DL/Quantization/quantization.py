@@ -146,7 +146,7 @@ def benchmark(model: nn.Module, X: torch.Tensor, runs: int = 100) -> float:
     Returns:
         float: Average inference time in seconds.
     """
-    
+
     model.eval()
     with torch.no_grad():
         for _ in range(10):
