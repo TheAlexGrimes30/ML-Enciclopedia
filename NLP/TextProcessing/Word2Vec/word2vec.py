@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Callable
 
 import numpy as np
 import torch
@@ -12,6 +12,16 @@ docs = [
 ]
 
 def tokenize(text: str) -> List[str]:
+    """
+    Split a sentence into lowercase tokens using whitespace.
+
+    Args:
+        text (str): Input sentence.
+
+    Returns:
+        List[str]: List of normalized tokens.
+    """
+
     return text.lower().split()
 
 sentences = [tokenize(d) for d in docs]
@@ -22,6 +32,20 @@ vocab_size = len(vocab)
 window_size = 2
 
 def generate_skipgram_data(sentences: List[List[str]], window: int) -> List[Tuple[int, int]]:
+    """
+    Generate (center, context) index pairs for Skip-Gram training.
+
+    For each word in a sentence, this function collects surrounding
+    words within the specified window as context words.
+
+    Args:
+        sentences (List[List[str]]): Tokenized corpus.
+        window (int): Context window size.
+
+    Returns:
+        List[Tuple[int, int]]: List of (center_word_idx, context_word_idx) pairs.
+    """
+
     pairs = []
     for sent in sentences:
         for i, center in enumerate(sent):
@@ -31,6 +55,20 @@ def generate_skipgram_data(sentences: List[List[str]], window: int) -> List[Tupl
     return pairs
 
 def generate_cbow_data(sentences: List[List[str]], window: int) -> List[Tuple[List[int], int]]:
+    """
+    Generate (context, target) samples for CBOW training.
+
+    The context consists of surrounding words within the given window,
+    and the target is the current center word.
+
+    Args:
+        sentences (List[List[str]]): Tokenized corpus.
+        window (int): Context window size.
+
+    Returns:
+        List[Tuple[List[int], int]]: List of (context_indices, target_index).
+    """
+
     data = []
     for sent in sentences:
         for i, target in enumerate(sent):
@@ -43,12 +81,28 @@ def generate_cbow_data(sentences: List[List[str]], window: int) -> List[Tuple[Li
     return data
 
 class SkipGram(nn.Module):
+    """
+    Minimal Skip-Gram implementation using two embedding matrices.
+    Predicts context words given a center word via dot-product similarity.
+    """
+
     def __init__(self, vocab_size: int, emb_dim: int):
         super().__init__()
         self.in_emb = nn.Embedding(vocab_size, emb_dim)
         self.out_emb = nn.Embedding(vocab_size, emb_dim)
 
     def forward(self, center: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
+        """
+        Compute Skip-Gram loss for a (center, context) pair.
+
+        Args:
+            center (Tensor): Index of the center word.
+            context (Tensor): Index of the context word.
+
+        Returns:
+            Tensor: Scalar loss value.
+        """
+
         center_vec = self.in_emb(center)
         context_vec = self.out_emb(context)
 
@@ -57,12 +111,27 @@ class SkipGram(nn.Module):
         return loss.mean()
 
 class CBOW(nn.Module):
+    """
+    Continuous Bag-of-Words model.
+    Predicts the target word from the mean of context embeddings.
+    """
+
     def __init__(self, vocab_size: int, emb_dim: int):
         super().__init__()
         self.in_emb = nn.Embedding(vocab_size, emb_dim)
         self.linear = nn.Linear(emb_dim, vocab_size)
 
     def forward(self, context_idxs: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of CBOW model.
+
+        Args:
+            context_idxs (Tensor): Indices of context words.
+
+        Returns:
+            Tensor: Logits over the vocabulary.
+        """
+
         emb = self.in_emb(context_idxs)
         mean_emb = emb.mean(dim=0)
         out = self.linear(mean_emb)
@@ -111,22 +180,50 @@ for epoch in tqdm(range(300), desc="CBOW Epochs"):
         total_loss += loss.item()
 
 def get_vector_skipgram(word: str) -> np.ndarray:
+    """
+    Retrieve a word embedding from the trained Skip-Gram model.
+    """
+
     idx = torch.tensor([word2idx[word]])
     return sg_model.in_emb(idx).detach().numpy()[0]
 
 def get_vector_cbow(word: str) -> np.ndarray:
+    """
+    Retrieve a word embedding from the trained CBOW model.
+    """
+
     idx = torch.tensor([word2idx[word]])
     return cbow_model.in_emb(idx).detach().numpy()[0]
 
-def doc_vector(model_func, doc):
+def doc_vector(model_func: Callable[[str], np.ndarray], doc: str) -> np.ndarray:
+    """
+    Compute a document embedding by averaging word embeddings.
+
+    Args:
+        model_func (Callable[[str], np.ndarray]):
+            Function that takes a word and returns its embedding vector.
+        doc (str): Input document.
+
+    Returns:
+        np.ndarray: Mean vector representation of the document.
+    """
+
     tokens = tokenize(doc)
     vectors = [model_func(w) for w in tokens]
     return np.mean(vectors, axis=0)
 
 def get_vector_gensim_sg(word: str) -> np.ndarray:
+    """
+    Retrieve a word embedding from gensim Skip-Gram Word2Vec.
+    """
+
     return w2v_model.wv[word]
 
 def get_vector_gensim_cbow(word: str) -> np.ndarray:
+    """
+    Retrieve a word embedding from gensim CBOW Word2Vec.
+    """
+
     return w2v_cbow_model.wv[word]
 
 for word in vocab:
@@ -170,3 +267,4 @@ for d in docs:
     print(" CBOW (PyTorch):    ", doc_vector(get_vector_cbow, d)[:5])
     print(" Gensim SG:         ", doc_vector(get_vector_gensim_sg, d)[:5])
     print(" Gensim CBOW:       ", doc_vector(get_vector_gensim_cbow, d)[:5])
+    
