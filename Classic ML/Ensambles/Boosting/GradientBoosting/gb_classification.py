@@ -1,4 +1,5 @@
-from typing import Union, Counter, Tuple, Optional
+from collections import Counter
+from typing import Union, Tuple, Optional
 
 import numpy as np
 from sklearn.datasets import make_classification
