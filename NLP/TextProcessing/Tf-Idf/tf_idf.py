@@ -1,120 +1,53 @@
+import math
+from collections import Counter
 from typing import List
 
-import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-corpus = [
-    "I love machine learning",
-    "Machine learning is amazing",
-    "I hate spam emails",
-    "Spam is annoying",
-    "I love deep learning",
-    "Deep learning is fun",
-    "Spam emails are terrible",
+docs = [
+    "I love NLP",
+    "I love ML"
 ]
 
-class CustomTfIdf:
-    """
-    Custom implementation of TF-IDF (Term Frequency - Inverse Document Frequency).
+def tokenize(text: str) -> List[str]:
+    return [w.lower() for w in text.split() if len(w) > 1]
 
-    Attributes
-        vocab : dict
-            Dictionary mapping each unique word to a column index in the feature matrix.
-        idf : np.ndarray
-            Array of IDF (inverse document frequency) values for each word in the vocabulary.
-    """
+def build_vocab(docs: List[str]) -> list[str]:
+    vocab = sorted(set(w for d in docs for w in tokenize(d)))
+    return vocab
 
-    def __init__(self):
-        """
-        Constructor of the TF-IDF vectorizer with empty vocabulary and IDF values.
-        """
+def tfidf_vector(doc: str, docs: List[str], vocab: List[str]) -> List[float]:
+    tokens = tokenize(doc)
+    tf = Counter(tokens)
+    vec = []
+    N = len(docs)
 
-        self.vocab = {}
-        self.idf = None
+    for word in vocab:
+        tf_val = tf[word] / len(tokens) if tokens else 0
+        df = sum(1 for d in docs if word in tokenize(d))
+        idf = math.log((1 + N) / (1 + df)) + 1
 
-    def fit(self, corpus: List[str]) -> None:
-        """
-        Learn the vocabulary and compute IDF values from the given corpus.
+        vec.append(tf_val * idf)
 
-        Parameters
-            corpus : List[str]
-                A list of documents (strings) to fit the TF-IDF model on.
+    norm = math.sqrt(sum(v*v for v in vec))
+    if norm:
+        vec = [v / norm for v in vec]
 
-        Steps
-            1. Build a vocabulary of all unique words across the corpus.
-            2. Count document frequency (DF) for each word.
-            3. Compute IDF using smoothed formula: log((N + 1) / (DF + 1)) + 1
-        """
+    return vec
 
-        all_words = set(word.lower() for doc in corpus for word in doc.split())
-        self.vocab = {word: idx for idx, word in enumerate(sorted(all_words))}
-        n_docs = len(corpus)
-        df = np.zeros(len(self.vocab))
-
-        for doc in corpus:
-            words_in_doc = set(word.lower() for word in doc.split())
-            for word in words_in_doc:
-                df[self.vocab[word]] += 1
-
-        self.idf = np.log((n_docs + 1) / (df + 1)) + 1
-
-    def transform(self, corpus: List[str]) -> np.ndarray:
-        """
-        Transform documents into TF-IDF feature matrix.
-
-        Parameters
-            corpus : List[str]
-                A list of documents (strings) to transform.
-
-        Returns
-            X : np.ndarray
-                2D array of shape (n_documents, n_features) where each row represents
-                a document and each column represents the TF-IDF weight of a word.
-
-        Steps
-            1. Compute term frequency (TF) for each word in each document.
-            2. Normalize TF by dividing by the total number of words in the document.
-            3. Multiply TF by precomputed IDF values to get TF-IDF.
-        """
-
-        X = np.zeros((len(corpus), len(self.vocab)))
-        for i, doc in enumerate(corpus):
-            tf = np.zeros(len(self.vocab))
-            words = doc.lower().split()
-            for word in words:
-                if word in self.vocab:
-                    tf[self.vocab[word]] += 1
-
-            if len(words) > 0:
-                tf /= len(words)
-            X[i] = tf * self.idf
-
-        return X
-
-    def fit_transform(self, corpus: List[str]) -> np.ndarray:
-        """
-        Fit the TF-IDF model on the corpus and transform the documents.
-
-        Parameters
-            corpus : List[str]
-                A list of documents (strings) to fit and transform.
-
-        Returns
-            X : np.ndarray
-                TF-IDF feature matrix.
-        """
-
-        self.fit(corpus)
-        return self.transform(corpus)
-
-custom_tfidf = CustomTfIdf()
-X_custom = custom_tfidf.fit_transform(corpus)
-
-print("Vocabulary:", custom_tfidf.vocab)
-print("Custom TF-IDF Matrix:\n", np.round(X_custom, 3))
 
 vectorizer = TfidfVectorizer()
-X_sklearn = vectorizer.fit_transform(corpus).toarray()
+X_sklearn = vectorizer.fit_transform(docs)
 
-print("\nSklearn Vocabulary:", vectorizer.vocabulary_)
-print("Sklearn TF-IDF Matrix:\n", np.round(X_sklearn, 3))
+for doc, vec in zip(docs, X_sklearn.toarray()):
+    print(f"Document: '{doc}'")
+    print("Vector:  ", vec)
+    print()
+
+manual_vocab = build_vocab(docs)
+
+for doc in docs:
+    vec = tfidf_vector(doc, docs, manual_vocab)
+    print(f"Document: '{doc}'")
+    print("Vector:  ", vec)
+    print()
