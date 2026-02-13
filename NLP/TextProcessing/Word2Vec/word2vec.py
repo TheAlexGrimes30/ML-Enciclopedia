@@ -267,4 +267,3 @@ for d in docs:
     print(" CBOW (PyTorch):    ", doc_vector(get_vector_cbow, d)[:5])
     print(" Gensim SG:         ", doc_vector(get_vector_gensim_sg, d)[:5])
     print(" Gensim CBOW:       ", doc_vector(get_vector_gensim_cbow, d)[:5])
-    
