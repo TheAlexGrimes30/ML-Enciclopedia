@@ -1,5 +1,6 @@
 from collections import Counter
 
+import faiss
 from sklearn.datasets import make_classification
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
@@ -40,3 +41,15 @@ for x in X_test:
 
 acc_annoy = accuracy_score(y_test, predictions_annoy)
 print("Annoy Accuracy:", acc_annoy)
+
+faiss_index = faiss.IndexFlatL2(dim)
+faiss_index.add(X_train)
+distances, indices = faiss_index.search(X_test, k)
+predictions_faiss = []
+
+for neighbors in indices:
+    neighbor_labels = y_train[neighbors]
+    prediction = Counter(neighbor_labels).most_common(1)[0][0]
+    predictions_faiss.append(prediction)
+acc_faiss = accuracy_score(y_test, predictions_faiss)
+print("Faiss Accuracy:", acc_faiss)
