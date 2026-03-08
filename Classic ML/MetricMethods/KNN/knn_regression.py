@@ -34,6 +34,20 @@ class KNNRegressor:
         self.y_train = y
 
     def _distance(self, x: np.ndarray) -> np.ndarray:
+
+        """
+        Calculate distance between one test sample x and all training samples.
+
+        Depending on the selected metric, this function computes:
+        - Euclidean distance
+        - Manhattan distance
+        - Minkowski distance
+        - Cosine distance
+
+        :param x: one test sample (1D array of features)
+        :return: array of distances between x and each training sample
+        """
+
         if self.metric == "euclidean":
             return np.sqrt(np.sum((self.X_train - x) ** 2, axis=1))
 
@@ -51,7 +65,7 @@ class KNNRegressor:
             return 1 - cosine_similarity_custom
 
         else:
-            raise ValueError("Unsuppoerted metric")
+            raise ValueError("Unsupported metric")
 
     def predict(self, X_test: np.ndarray) -> np.ndarray:
         """
@@ -82,15 +96,15 @@ yr_pred_my = my_knn_reg.predict(Xr_test)
 
 my_knn_reg_manhattan = KNNRegressor(k=5, metric="manhattan")
 my_knn_reg_manhattan.fit(Xr_train, yr_train)
-yr_pred_my_manhattan = my_knn_reg.predict(Xr_test)
+yr_pred_my_manhattan = my_knn_reg_manhattan.predict(Xr_test)
 
 my_knn_reg_minkowski = KNNRegressor(k=5, metric="minkowski")
 my_knn_reg_minkowski.fit(Xr_train, yr_train)
-yr_pred_my_minkowski = my_knn_reg.predict(Xr_test)
+yr_pred_my_minkowski = my_knn_reg_minkowski.predict(Xr_test)
 
 my_knn_reg_cosine = KNNRegressor(k=5, metric="cosine")
 my_knn_reg_cosine.fit(Xr_train, yr_train)
-yr_pred_my_cosine = my_knn_reg.predict(Xr_test)
+yr_pred_my_cosine = my_knn_reg_cosine.predict(Xr_test)
 
 sk_knn_reg = KNeighborsRegressor(n_neighbors=5)
 sk_knn_reg.fit(Xr_train, yr_train)
