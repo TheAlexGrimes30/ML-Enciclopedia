@@ -44,15 +44,71 @@ class BallNode:
         self.right = right
 
 class BallTreeKNN:
+    """
+    k-Nearest Neighbors classifier based on a Ball Tree data structure.
+
+    The Ball Tree partitions the feature space into hyperspheres (balls).
+    Each node of the tree represents a region defined by a center and radius.
+    During nearest neighbor search, entire regions can be pruned if they
+    cannot contain closer points than the current best neighbors.
+
+    This implementation supports building a Ball Tree and performing
+    KNN classification using Euclidean distance.
+    """
+
     def __init__(self, k: int = 3, leaf_size: int = 10):
+        """
+        Initialize the BallTreeKNN classifier.
+
+        Parameters
+            k : int, default=3
+                Number of nearest neighbors used for classification.
+
+            leaf_size : int, default=10
+                Maximum number of points stored in a leaf node.
+                When the number of samples in a node is less than or equal
+                to leaf_size, the node becomes a leaf.
+        """
+
         self.k = k
         self.leaf_size = leaf_size
         self.root = None
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Build the Ball Tree from the training dataset.
+
+        Parameters
+            X : np.ndarray
+                Training feature matrix of shape (n_samples, n_features).
+
+            y : np.ndarray
+                Training labels of shape (n_samples,).
+        """
+
         self.root = self._build_tree(X, y)
 
     def _build_tree(self, X: np.ndarray, y: np.ndarray) -> "BallNode":
+        """
+        Recursively construct the Ball Tree.
+
+        Each node represents a hypersphere defined by a center and radius.
+        The dataset is recursively split along the dimension with the
+        largest variance until the number of points is less than or equal
+        to leaf_size.
+
+        Parameters
+            X : np.ndarray
+                Subset of feature vectors belonging to the current node.
+
+            y : np.ndarray
+                 Corresponding labels.
+
+        Returns
+            BallNode
+                Root node of the constructed subtree.
+        """
+
         center = np.mean(X, axis=0)
         radius = np.max(np.linalg.norm(X - center, axis=1))
 
@@ -71,6 +127,22 @@ class BallTreeKNN:
         return BallNode(center, radius, None, None, left, right)
 
     def predict(self, X_test: np.ndarray) -> np.ndarray:
+        """
+        Predict class labels for the given test samples.
+
+        For each test point, the Ball Tree is searched to find the
+        k nearest neighbors. The predicted class is determined by
+        majority voting among neighbor labels.
+
+        Parameters
+            X_test : np.ndarray
+                Test feature matrix of shape (n_samples, n_features).
+
+        Returns
+            np.ndarray
+                Predicted class labels.
+        """
+
         predictions = []
 
         for x in X_test:
@@ -82,7 +154,27 @@ class BallTreeKNN:
 
         return np.array(predictions)
 
-    def _search(self, node: "BallNode", target: np.ndarray, neighbors: np.ndarray):
+    def _search(self, node: "BallNode", target: np.ndarray, neighbors: list) -> None:
+        """
+        Recursively search the Ball Tree for the k nearest neighbors.
+
+        The algorithm uses branch pruning based on the distance
+        between the target point and the node's hypersphere.
+        If the hypersphere cannot contain a closer point than the
+        current worst neighbor, the branch is skipped.
+
+        Parameters
+            node : BallNode
+                Current node being explored.
+
+            target : np.ndarray
+                Query point for which neighbors are searched.
+
+            neighbors : list
+                Max-heap storing the current k nearest neighbors.
+                Each element is stored as (-distance, label).
+        """
+
         if node is None:
             return
 
