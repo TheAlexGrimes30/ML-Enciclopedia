@@ -43,15 +43,68 @@ class RPTreeNode:
         self.right = right
 
 class RPTreeKNN:
+    """
+    k-Nearest Neighbors classifier using Random Projection Trees.
+
+    This algorithm builds a tree by recursively splitting the data using
+    random projection directions. It is particularly useful in high-dimensional
+    spaces where KD-Tree performance degrades.
+
+    The tree enables approximate nearest neighbor search by exploring
+    promising branches and pruning unlikely regions.
+    """
+
     def __init__(self, k: int = 3, leaf_size: int = 10):
+        """
+        Initialize the RPTreeKNN classifier.
+
+        Parameters
+            k : int, default=3
+                Number of nearest neighbors used for prediction.
+
+            leaf_size : int, default=10
+                Maximum number of points stored in a leaf node.
+        """
+
         self.k = k
         self.leaf_size = leaf_size
         self.root = None
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Build the Random Projection Tree from training data.
+
+        Parameters
+            X : np.ndarray
+                Training feature matrix of shape (n_samples, n_features).
+
+            y : np.ndarray
+                Training labels of shape (n_samples,).
+        """
+
         self.root = self._build_tree(X, y)
 
     def _build_tree(self, X: np.ndarray, y: np.ndarray) -> "RPTreeNode":
+        """
+        Recursively construct the Random Projection Tree.
+
+        At each node:
+            - A random projection vector is generated
+            - Data is projected onto this vector
+            - Points are split based on the median projection value
+
+        Parameters
+            X : np.ndarray
+                Subset of feature vectors.
+
+            y : np.ndarray
+                Corresponding labels.
+
+        Returns
+            RPTreeNode
+                Root node of the constructed subtree.
+        """
+
         if len(X) <= self.leaf_size:
             return RPTreeNode(points=X, labels=y)
 
@@ -75,6 +128,25 @@ class RPTreeKNN:
         )
 
     def _search(self, node: "RPTreeNode", target: np.ndarray, neighbors: list) -> None:
+        """
+        Search for k nearest neighbors in the Random Projection Tree.
+
+        The algorithm:
+        - Traverses the tree based on projection of the target point
+        - Searches the most promising branch first
+        - Optionally explores the opposite branch if needed
+
+        Parameters
+            node : Optional[RPTreeNode]
+                Current node in the tree.
+
+            target : np.ndarray
+                Query point.
+
+            neighbors : list
+                Max-heap storing current nearest neighbors as (-distance, label).
+        """
+
         if node is None:
             return
 
@@ -106,6 +178,21 @@ class RPTreeKNN:
             self._search(far_branch, target, neighbors)
 
     def predict(self, X_test: np.ndarray) -> np.ndarray:
+        """
+        Predict class labels for test samples.
+
+        For each test point:
+        - Perform tree search to find k nearest neighbors
+        - Use majority voting to determine the predicted label
+
+        Parameters
+            X_test : np.ndarray
+                Test feature matrix of shape (n_samples, n_features).
+
+        Returns
+            np.ndarray
+                Predicted class labels.
+        """
 
         predictions = []
 
