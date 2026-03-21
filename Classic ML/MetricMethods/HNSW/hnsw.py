@@ -1,4 +1,5 @@
 import heapq
+from typing import List
 
 import numpy as np
 from sklearn.datasets import make_classification
@@ -7,24 +8,84 @@ from sklearn.model_selection import train_test_split
 
 
 class HNSWNode:
+    """
+        Node in HNSW (Hierarchical Navigable Small World) graph.
+
+    Each node represents a data point and maintains connections
+    (edges) to its nearest neighbors in the graph.
+
+    Attributes
+        vector : np.ndarray
+            Feature vector representing the node.
+
+    label : int
+        Class label associated with the node.
+
+    neighbors : list[HNSWNode]
+        List of neighboring nodes (graph edges).
+    """
+
     def __init__(self, vector: np.ndarray, label: int):
+        """
+        Initialize an HNSW node.
+
+        Parameters
+            vector : np.ndarray
+                Feature vector of shape (n_features,).
+
+            label : int
+                Class label.
+        """
+
         self.vector = vector
         self.label = label
         self.neighbors = []
 
 class HNSWKNN:
     """
-    k-Nearest Neighbors classifier using simplified HNSW graph.
+    k-Nearest Neighbors classifier using a simplified HNSW graph.
+
+    HNSW (Hierarchical Navigable Small World) is a graph-based
+    approximate nearest neighbor algorithm. It builds a graph where
+    nodes are connected to their nearest neighbors, enabling efficient
+    navigation during search.
     """
 
     def __init__(self, k=3, M=5):
+        """
+        Initialize the HNSWKNN classifier.
+
+        Parameters
+        ----------
+        k : int, default=3
+            Number of nearest neighbors used for prediction.
+
+        M : int, default=5
+            Maximum number of neighbors per node (graph connectivity).
+        """
 
         self.k = k
         self.M = M
         self.nodes = []
         self.entry_point = None
 
-    def fit(self, X, y):
+    def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Build the HNSW graph from training data.
+
+        For each data point:
+        - A node is created
+        - The node is connected to its nearest neighbors
+        - Graph connectivity is limited by parameter M
+
+        Parameters
+        ----------
+        X : np.ndarray
+            Training feature matrix of shape (n_samples, n_features).
+
+        y : np.ndarray
+            Training labels of shape (n_samples,).
+        """
 
         for vector, label in zip(X, y):
 
@@ -45,7 +106,23 @@ class HNSWKNN:
 
             self.nodes.append(node)
 
-    def _search_layer(self, query):
+    def _search_layer(self, query: np.ndarray) -> List["HNSWNode"]:
+        """
+        Perform a naive nearest neighbor search over all nodes.
+
+        This method computes distances from the query to all nodes
+        and returns nodes sorted by distance.
+
+        Parameters
+        ----------
+        query : np.ndarray
+            Query vector of shape (n_features,).
+
+        Returns
+        -------
+        list[HNSWNode]
+            List of nodes sorted by increasing distance to the query.
+        """
 
         candidates = []
 
@@ -59,7 +136,25 @@ class HNSWKNN:
 
         return [node for _, node in candidates]
 
-    def predict(self, X_test):
+    def predict(self, X_test: np.ndarray) -> np.ndarray:
+        """
+        Predict class labels for test samples.
+
+        For each test point:
+        - Perform nearest neighbor search in the graph
+        - Select k closest nodes
+        - Use majority voting to determine the predicted label
+
+        Parameters
+        ----------
+        X_test : np.ndarray
+            Test feature matrix of shape (n_samples, n_features).
+
+        Returns
+        -------
+        np.ndarray
+            Predicted class labels of shape (n_samples,).
+        """
 
         predictions = []
 
