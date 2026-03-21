@@ -7,7 +7,27 @@ from sklearn.model_selection import train_test_split
 
 
 class LSHKNN:
+    """
+    k-Nearest Neighbors classifier using Locality-Sensitive Hashing (LSH).
+
+    This implementation uses random hyperplanes to hash points into buckets.
+    During prediction, only points from the same hash bucket are considered
+    as candidate neighbors, which significantly reduces the search space.
+    """
+
     def __init__(self, k: int = 3, n_planes: int = 10):
+        """
+        Initialize the LSHKNN classifier.
+
+        Parameters
+            k : int, default=3
+                Number of nearest neighbors to use for classification.
+
+            n_planes : int, default=10
+                Number of random hyperplanes used for hashing.
+                More planes increase selectivity but reduce recall.
+        """
+
         self.k = k
         self.n_planes = n_planes
         self.hash_tables = {}
@@ -16,6 +36,20 @@ class LSHKNN:
         self.y = None
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Build hash tables for the training data.
+
+        Each data point is projected onto multiple random hyperplanes,
+        and a binary hash is generated based on the sign of projections.
+
+        Parameters
+            X : np.ndarray
+                Training feature matrix of shape (n_samples, n_features).
+
+            y : np.ndarray
+                Training labels of shape (n_samples,).
+        """
+
         self.X = X
         self.y = y
         dim = X.shape[1]
@@ -31,10 +65,46 @@ class LSHKNN:
             self.hash_tables[h].append(idx)
 
     def _hash(self, point: np.ndarray) -> tuple:
+        """
+        Compute the hash of a data point using random projections.
+
+        Each projection determines a binary value:
+        - True if projection > 0
+        - False otherwise
+
+        The final hash is a tuple of boolean values.
+
+        Parameters
+            point : np.ndarray
+                Input vector of shape (n_features,).
+
+        Returns
+            tuple
+                Binary hash representing the bucket key.
+        """
+
         projections = point @ self.planes.T
         return tuple(projections > 0)
 
     def predict(self, X_test: np.ndarray) -> np.ndarray:
+        """
+        Predict class labels for test samples.
+
+        For each test point:
+        - Compute its hash
+        - Retrieve candidate points from the same bucket
+        - Perform KNN on the candidate set
+        - If no candidates are found, fallback to random prediction
+
+        Parameters
+            X_test : np.ndarray
+                Test feature matrix of shape (n_samples, n_features).
+
+        Returns
+            np.ndarray
+                Predicted class labels.
+        """
+
         predictions = []
 
         for x in X_test:
