@@ -26,6 +26,7 @@ class ConvNeXtBlock(nn.Module):
             in_channels=channels,
             out_channels=channels,
             kernel_size=7,
+            padding=3,
             groups=channels,
             bias=True
         )
