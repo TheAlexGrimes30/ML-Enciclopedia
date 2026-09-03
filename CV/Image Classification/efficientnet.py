@@ -671,6 +671,7 @@ def main():
     )
 
     torchvision_model = efficientnet_b0(
+
         weights=None
     )
 
