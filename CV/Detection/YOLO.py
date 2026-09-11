@@ -160,9 +160,6 @@ class C3k2(nn.Module):
 class SPPF(nn.Module):
     """
     Spatial Pyramid Pooling Fast.
-
-    Один MaxPool 5x5 применяется три раза последовательно.
-    YOLO26 использует residual shortcut в SPPF.
     """
 
     def __init__(
@@ -215,7 +212,7 @@ class SPPF(nn.Module):
 
 class PSABlock(nn.Module):
     """
-    Упрощённый Position-Sensitive Attention block.
+    Position-Sensitive Attention block.
 
     Attention работает по пространственным токенам H*W,
     после чего используется convolutional FFN.
