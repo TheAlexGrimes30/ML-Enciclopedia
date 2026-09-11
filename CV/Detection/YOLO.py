@@ -18,7 +18,7 @@ np.random.seed(SEED)
 torch.manual_seed(SEED)
 
 
-class Conv(nn.Module):
+class ConvBlock(nn.Module):
     def __init__(
             self,
             in_channels: int,
@@ -66,13 +66,13 @@ class Bottleneck(nn.Module):
     ):
         super().__init__()
 
-        self.conv1 = Conv(
+        self.conv1 = ConvBlock(
             in_channels=channels,
             out_channels=channels,
             kernel_size=3
         )
 
-        self.conv2 = Conv(
+        self.conv2 = ConvBlock(
             in_channels=channels,
             out_channels=channels,
             kernel_size=3
@@ -94,19 +94,6 @@ class Bottleneck(nn.Module):
 
 
 class C3k2(nn.Module):
-    """
-    Учебная C2f/C3k2-подобная реализация.
-
-    Идея:
-        1. 1x1 Conv.
-        2. Split на две ветки.
-        3. Вторая ветка проходит через Bottleneck-блоки.
-        4. Все промежуточные признаки конкатенируются.
-        5. 1x1 Conv смешивает признаки.
-
-    Production C3k2 в Ultralytics имеет дополнительные варианты
-    внутренних C3k/attention блоков и compound scaling.
-    """
 
     def __init__(
             self,
@@ -122,7 +109,7 @@ class C3k2(nn.Module):
             * expansion
         )
 
-        self.conv1 = Conv(
+        self.conv1 = ConvBlock(
             in_channels=in_channels,
             out_channels=hidden_channels * 2,
             kernel_size=1
@@ -136,7 +123,7 @@ class C3k2(nn.Module):
             for _ in range(n)
         ])
 
-        self.conv2 = Conv(
+        self.conv2 = ConvBlock(
             in_channels=hidden_channels * (2 + n),
             out_channels=out_channels,
             kernel_size=1
@@ -186,7 +173,7 @@ class SPPF(nn.Module):
 
         hidden_channels = channels // 2
 
-        self.conv1 = Conv(
+        self.conv1 = ConvBlock(
             in_channels=channels,
             out_channels=hidden_channels,
             kernel_size=1
@@ -198,7 +185,7 @@ class SPPF(nn.Module):
             padding=2
         )
 
-        self.conv2 = Conv(
+        self.conv2 = ConvBlock(
             in_channels=hidden_channels * 4,
             out_channels=channels,
             kernel_size=1
@@ -253,7 +240,7 @@ class PSABlock(nn.Module):
         )
 
         self.ffn = nn.Sequential(
-            Conv(
+            ConvBlock(
                 in_channels=channels,
                 out_channels=channels * 2,
                 kernel_size=1
@@ -311,7 +298,7 @@ class C2PSA(nn.Module):
 
         hidden_channels = channels // 2
 
-        self.conv1 = Conv(
+        self.conv1 = ConvBlock(
             in_channels=channels,
             out_channels=channels,
             kernel_size=1
@@ -325,7 +312,7 @@ class C2PSA(nn.Module):
             for _ in range(n)
         ])
 
-        self.conv2 = Conv(
+        self.conv2 = ConvBlock(
             in_channels=channels,
             out_channels=channels,
             kernel_size=1
@@ -365,14 +352,14 @@ class YOLO26Backbone(nn.Module):
         c4 = base_channels * 8
         c5 = base_channels * 16
 
-        self.stem1 = Conv(
+        self.stem1 = ConvBlock(
             in_channels=3,
             out_channels=c1,
             kernel_size=3,
             stride=2
         )
 
-        self.stem2 = Conv(
+        self.stem2 = ConvBlock(
             in_channels=c1,
             out_channels=c2,
             kernel_size=3,
@@ -385,7 +372,7 @@ class YOLO26Backbone(nn.Module):
             n=1
         )
 
-        self.down3 = Conv(
+        self.down3 = ConvBlock(
             in_channels=c3,
             out_channels=c3,
             kernel_size=3,
@@ -398,7 +385,7 @@ class YOLO26Backbone(nn.Module):
             n=2
         )
 
-        self.down4 = Conv(
+        self.down4 = ConvBlock(
             in_channels=c3,
             out_channels=c4,
             kernel_size=3,
@@ -411,7 +398,7 @@ class YOLO26Backbone(nn.Module):
             n=2
         )
 
-        self.down5 = Conv(
+        self.down5 = ConvBlock(
             in_channels=c4,
             out_channels=c5,
             kernel_size=3,
@@ -495,7 +482,7 @@ class YOLO26Neck(nn.Module):
             n=2
         )
 
-        self.down4 = Conv(
+        self.down4 = ConvBlock(
             in_channels=c3,
             out_channels=c4,
             kernel_size=3,
@@ -508,7 +495,7 @@ class YOLO26Neck(nn.Module):
             n=2
         )
 
-        self.down5 = Conv(
+        self.down5 = ConvBlock(
             in_channels=c4,
             out_channels=c5,
             kernel_size=3,
@@ -576,14 +563,14 @@ class DWConvBlock(nn.Module):
         super().__init__()
 
         self.block = nn.Sequential(
-            Conv(
+            ConvBlock(
                 in_channels=channels,
                 out_channels=channels,
                 kernel_size=3,
                 groups=channels
             ),
 
-            Conv(
+            ConvBlock(
                 in_channels=channels,
                 out_channels=channels,
                 kernel_size=1
@@ -614,13 +601,13 @@ class DetectionScaleHead(nn.Module):
         super().__init__()
 
         self.box_head = nn.Sequential(
-            Conv(
+            ConvBlock(
                 in_channels=channels,
                 out_channels=channels,
                 kernel_size=3
             ),
 
-            Conv(
+            ConvBlock(
                 in_channels=channels,
                 out_channels=channels,
                 kernel_size=3
