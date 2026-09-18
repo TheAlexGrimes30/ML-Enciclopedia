@@ -99,10 +99,7 @@ class VGG(nn.Module):
             ),
 
             nn.ReLU(),
-
-            nn.Dropout(
-                p=0.5
-            ),
+            nn.Dropout(p=0.5),
 
             nn.Linear(
                 64,
@@ -116,14 +113,8 @@ class VGG(nn.Module):
     ) -> torch.Tensor:
 
         x = self.features(x)
-
         x = self.avgpool(x)
-
-        x = torch.flatten(
-            x,
-            start_dim=1
-        )
-
+        x = torch.flatten(x, start_dim=1)
         x = self.classifier(x)
 
         return x

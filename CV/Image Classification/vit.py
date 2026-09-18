@@ -101,9 +101,7 @@ class MultiHeadSelfAttention(nn.Module):
             4
         )
 
-        query, key, value = qkv.unbind(
-            dim=0
-        )
+        query, key, value = qkv.unbind(dim=0)
 
         attention_scores = (
                     query @ key.transpose(-2, -1)
@@ -114,9 +112,7 @@ class MultiHeadSelfAttention(nn.Module):
             dim=-1
         )
 
-        attention = self.attention_dropout(
-            attention
-        )
+        attention = self.attention_dropout(attention)
 
         x = attention @ value
 
@@ -170,9 +166,7 @@ class TransformerEncoderBlock(nn.Module):
     ):
         super().__init__()
 
-        self.norm1 = nn.LayerNorm(
-            embed_dim
-        )
+        self.norm1 = nn.LayerNorm(embed_dim)
 
         self.attention = MultiHeadSelfAttention(
             embed_dim=embed_dim,
@@ -194,13 +188,8 @@ class TransformerEncoderBlock(nn.Module):
             self,
             x: torch.Tensor
     ) -> torch.Tensor:
-        x = x + self.attention(
-            self.norm1(x)
-        )
-
-        x = x + self.mlp(
-            self.norm2(x)
-        )
+        x = x + self.attention(self.norm1(x))
+        x = x + self.mlp(self.norm2(x))
 
         return x
 

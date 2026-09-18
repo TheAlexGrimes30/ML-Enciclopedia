@@ -89,10 +89,7 @@ class SobelFilter:
             ksize=3
         )
 
-        magnitude = cv2.magnitude(
-            gx,
-            gy
-        )
+        magnitude = cv2.magnitude(gx, gy)
 
         if magnitude.max() > 0:
             magnitude = (

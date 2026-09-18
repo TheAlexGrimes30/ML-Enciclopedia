@@ -1,4 +1,5 @@
 import math
+from dataclasses import dataclass
 from typing import Optional, Tuple
 
 import torch
@@ -7,78 +8,99 @@ import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
 
 
-def make_padding_mask(x: torch.Tensor, pad_token_id: int = 0) -> torch.Tensor:
+@dataclass
+class BERTConfig:
     """
-    Create a mask to ignore padding tokens in attention.
+    Minimal configuration for an educational BERT implementation.
+    Defaults are intentionally small so the model can be run on a CPU.
+    """
+
+    vocab_size: int
+    d_model: int = 128
+    n_heads: int = 4
+    d_ff: int = 512
+    num_layers: int = 4
+    max_seq_len: int = 128
+    type_vocab_size: int = 2
+    dropout: float = 0.1
+    attention_dropout: float = 0.1
+    layer_norm_eps: float = 1e-12
+    initializer_range: float = 0.02
+    pad_token_id: int = 0
+
+def make_padding_mask(
+    input_ids: torch.Tensor,
+    pad_token_id: int = 0
+) -> torch.Tensor:
+    """
+    Create a boolean self-attention mask.
 
     Args:
-        x (torch.Tensor): Input tensor (batch_size, seq_len)
-        pad_token_id (int): ID of padding token
+        input_ids:
+            Token IDs of shape (batch_size, seq_len).
+        pad_token_id:
+            ID of the [PAD] token.
 
     Returns:
-        torch.Tensor: Mask of shape (batch_size, 1, 1, seq_len)
+        Boolean tensor of shape (batch_size, 1, 1, seq_len).
+
+        True  -> token may be attended to.
+        False -> token is padding and must be ignored.
     """
 
-    return (x != pad_token_id).unsqueeze(1).unsqueeze(2)
+    return (input_ids != pad_token_id).unsqueeze(1).unsqueeze(2)
+
 
 class MultiHeadAttention(nn.Module):
     """
-    Multi-Head Self-Attention module.
+    Multi-Head Self-Attention used by BERT.
 
-    Splits the input into multiple heads, computes scaled dot-product attention
-    for each head independently, and then concatenates the results.
+    Input:
+        x: (B, L, D)
 
-    Args:
-        d_model (int): Total hidden size of the model.
-        n_heads (int): Number of attention heads.
-        dropout (float): Dropout applied to attention weights.
+    Internally:
+        Q, K, V -> (B, H, L, D_head)
+
+    Attention:
+        softmax(QK^T / sqrt(D_head)) V
     """
 
-    def __init__(self, d_model: int, n_heads: int, dropout: float = 0.1):
-        """
-        Initializes the Multi-Head Attention module.
-
-        Args:
-            d_model (int): Total dimensionality of the model (embedding size).
-            n_heads (int): Number of attention heads to split d_model into.
-            dropout (float): Dropout probability applied to attention weights.
-
-        Notes:
-            - d_k is computed as d_model // n_heads, representing the dimension
-                of each individual attention head.
-            - Four linear layers are created:
-                * q: projects input into queries
-                * k: projects input into keys
-                * v: projects input into values
-                * o: final output projection that recombines all heads
-            - Xavier initialization is applied to all weight matrices
-                to improve training stability.
-        """
+    def __init__(
+            self,
+            d_model: int,
+            n_heads: int,
+            attention_dropout: float = 0.1
+    ):
 
         super().__init__()
         self.d_model = d_model
         self.n_heads = n_heads
-        self.d_k = d_model // n_heads
+        self.head_dim = d_model // n_heads
+        self.scale = self.head_dim ** -0.5
 
-        self.q = nn.Linear(d_model, d_model)
-        self.k = nn.Linear(d_model, d_model)
-        self.v = nn.Linear(d_model, d_model)
-        self.o = nn.Linear(d_model, d_model)
-        self.dropout = nn.Dropout(dropout)
+        self.query = nn.Linear(d_model, d_model)
+        self.key = nn.Linear(d_model, d_model)
+        self.value = nn.Linear(d_model, d_model)
+        self.output = nn.Linear(d_model, d_model)
+        self.attention_dropout = nn.Dropout(attention_dropout)
 
-        for p in [self.q.weight, self.k.weight, self.v.weight, self.o.weight]:
-            nn.init.xavier_normal_(p)
-
-    def _shape(self, x: torch.Tensor) -> torch.Tensor:
+    def _split_heads(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Reshapes (B, seq_len, d_model) into (B, n_heads, seq_len, d_k).
-
-        Then swaps dimensions so we get:
-            - heads dimension before seq_len (as expected in attention)
+        (B, L, D)
+            ->
+        (B, H, L, D_head)
         """
 
-        b, seq_len, _ = x.size()
-        return x.view(b, seq_len, self.n_heads, self.d_k).transpose(1, 2)
+        batch_size, seq_len, _ = x.shape
+
+        x = x.view(
+            batch_size,
+            seq_len,
+            self.n_heads,
+            self.head_dim
+        )
+
+        return x.transpose(1, 2)
 
     def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         """

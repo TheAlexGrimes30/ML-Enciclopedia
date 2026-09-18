@@ -88,19 +88,13 @@ class CannyDetector:
                     n1 = magnitude[y - 1, x - 1]
                     n2 = magnitude[y + 1, x + 1]
 
-                if (
-                        current >= n1
-                        and current >= n2
-                ):
+                if current >= n1 and current >= n2:
                     output[y, x] = current
 
         return output
 
-    def threshold(self, image):
-        result = np.zeros_like(
-            image,
-            dtype=np.uint8
-        )
+    def threshold(self, image: np.ndarray):
+        result = np.zeros_like(image, dtype=np.uint8)
 
         strong = image >= self.high_threshold
 
@@ -127,9 +121,7 @@ class CannyDetector:
                             x - 1:x + 2
                             ]
 
-                    if np.any(
-                            patch == 255
-                    ):
+                    if np.any(patch == 255):
                         image[y, x] = 255
                     else:
                         image[y, x] = 0
@@ -137,9 +129,7 @@ class CannyDetector:
         return image
 
     def apply(self, image: np.ndarray):
-        image = image.astype(
-            np.float32
-        )
+        image = image.astype(np.float32)
 
         image = cv2.GaussianBlur(
             image,
@@ -161,10 +151,7 @@ class CannyDetector:
             gx ** 2 + gy ** 2
         )
 
-        angle = np.arctan2(
-            gy,
-            gx
-        )
+        angle = np.arctan2(gy, gx)
 
         if magnitude.max() > 0:
             magnitude = (
@@ -178,13 +165,8 @@ class CannyDetector:
             angle
         )
 
-        thresholded = self.threshold(
-            thin_edges
-        )
-
-        edges = self.hysteresis(
-            thresholded
-        )
+        thresholded = self.threshold(thin_edges)
+        edges = self.hysteresis(thresholded)
 
         return edges
 

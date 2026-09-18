@@ -76,10 +76,7 @@ class TransformerBlock(nn.Module):
         )
 
         x = x + attention_output
-
-        x = x + self.mlp(
-            self.norm2(x)
-        )
+        x = x + self.mlp(self.norm2(x))
 
         return x
 
@@ -167,7 +164,6 @@ class MaskDecoder(nn.Module):
             ),
 
             nn.BatchNorm2d(128),
-
             nn.ReLU(inplace=True),
 
             nn.ConvTranspose2d(
@@ -208,7 +204,6 @@ class MaskDecoder(nn.Module):
         )
 
         x = image_embeddings + prompt_embeddings
-
         mask_logits = self.decoder(x)
 
         return mask_logits
@@ -232,13 +227,8 @@ class SAM(nn.Module):
             num_heads=num_heads
         )
 
-        self.prompt_encoder = PointPromptEncoder(
-            embed_dim=embed_dim
-        )
-
-        self.mask_decoder = MaskDecoder(
-            embed_dim=embed_dim
-        )
+        self.prompt_encoder = PointPromptEncoder(embed_dim=embed_dim)
+        self.mask_decoder = MaskDecoder(embed_dim=embed_dim)
 
     def forward(
             self,
@@ -246,13 +236,8 @@ class SAM(nn.Module):
             point: torch.Tensor
     ) -> torch.Tensor:
 
-        image_embeddings = self.image_encoder(
-            image
-        )
-
-        prompt_embedding = self.prompt_encoder(
-            point
-        )
+        image_embeddings = self.image_encoder(image)
+        prompt_embedding = self.prompt_encoder(point)
 
         mask_logits = self.mask_decoder(
             image_embeddings,

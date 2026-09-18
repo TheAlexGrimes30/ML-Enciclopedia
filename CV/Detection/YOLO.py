@@ -42,19 +42,11 @@ class ConvBlock(nn.Module):
                 bias=False
             ),
 
-            nn.BatchNorm2d(
-                out_channels
-            ),
-
-            nn.SiLU(
-                inplace=True
-            )
+            nn.BatchNorm2d(out_channels),
+            nn.SiLU(inplace=True)
         )
 
-    def forward(
-            self,
-            x: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.block(x)
 
 
@@ -104,10 +96,7 @@ class C3k2(nn.Module):
     ):
         super().__init__()
 
-        hidden_channels = int(
-            out_channels
-            * expansion
-        )
+        hidden_channels = int(out_channels * expansion)
 
         self.conv1 = ConvBlock(
             in_channels=in_channels,
@@ -135,24 +124,15 @@ class C3k2(nn.Module):
     ) -> torch.Tensor:
         x = self.conv1(x)
 
-        left, right = x.chunk(
-            chunks=2,
-            dim=1
-        )
+        left, right = x.chunk(chunks=2, dim=1)
 
-        features = [
-            left,
-            right
-        ]
+        features = [left, right]
 
         for block in self.blocks:
             right = block(right)
             features.append(right)
 
-        x = torch.cat(
-            features,
-            dim=1
-        )
+        x = torch.cat(features, dim=1)
 
         return self.conv2(x)
 

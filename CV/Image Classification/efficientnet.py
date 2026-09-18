@@ -195,10 +195,7 @@ class EfficientNet(nn.Module):
                 bias=False
             ),
 
-            nn.BatchNorm2d(
-                256
-            ),
-
+            nn.BatchNorm2d(256),
             nn.SiLU()
         )
 
@@ -208,9 +205,7 @@ class EfficientNet(nn.Module):
 
         self.classifier = nn.Sequential(
 
-            nn.Dropout(
-                p=0.2
-            ),
+            nn.Dropout(p=0.2),
 
             nn.Linear(
                 in_features=256,

@@ -31,9 +31,7 @@ class ResidualBlock(nn.Module):
             bias=False
         )
 
-        self.bn1 = nn.BatchNorm2d(
-            out_channels
-        )
+        self.bn1 = nn.BatchNorm2d(out_channels)
 
         self.relu = nn.ReLU()
 
@@ -45,11 +43,9 @@ class ResidualBlock(nn.Module):
             bias=False
         )
 
-        self.bn2 = nn.BatchNorm2d(
-            out_channels
-        )
+        self.bn2 = nn.BatchNorm2d(out_channels)
 
-        if (stride != 1 or in_channels != out_channels):
+        if stride != 1 or in_channels != out_channels:
             self.shortcut = nn.Sequential(
 
                 nn.Conv2d(

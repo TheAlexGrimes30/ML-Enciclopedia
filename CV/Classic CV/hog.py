@@ -125,9 +125,7 @@ class HOGDescriptor:
                         mag = mag_cell[y, x]
                         ang = ang_cell[y, x]
 
-                        bin_idx = int(
-                            ang // bin_width
-                        )
+                        bin_idx = int(ang // bin_width)
 
                         if bin_idx == self.bins:
                             bin_idx = 0
@@ -168,9 +166,7 @@ class HOGDescriptor:
 
                 block = block / norm
 
-                features.extend(
-                    block
-                )
+                features.extend(block)
 
         return np.array(
             features,
@@ -178,22 +174,10 @@ class HOGDescriptor:
         )
 
     def apply(self, image: np.ndarray):
-        image = image.astype(
-            np.float32
-        )
-
-        magnitude, angle = self.gradients(
-            image
-        )
-
-        histograms = self.cell_histogram(
-            magnitude,
-            angle
-        )
-
-        features = self.normalize_blocks(
-            histograms
-        )
+        image = image.astype(np.float32)
+        magnitude, angle = self.gradients(image)
+        histograms = self.cell_histogram(magnitude, angle)
+        features = self.normalize_blocks(histograms)
 
         return features
 

@@ -22,72 +22,40 @@ class SIFTDetector:
     ):
         pyramid = []
 
-        image = image.astype(
-            np.float32
-        ) / 255.0
-
-        k = 2 ** (
-                1 / self.scales
-        )
-
+        image = image.astype(np.float32) / 255.0
+        k = 2 ** (1 / self.scales)
         current = image
 
-        for octave in range(
-                self.octaves
-        ):
+        for octave in range(self.octaves):
             levels = []
 
-            for scale in range(
-                    self.scales + 3
-            ):
-                sigma = (
-                        self.sigma
-                        * k ** scale
-                )
+            for scale in range(self.scales + 3):
+                sigma = (self.sigma * k ** scale)
 
                 blurred = gaussian_filter(
                     current,
                     sigma=sigma
                 )
 
-                levels.append(
-                    blurred
-                )
+                levels.append(blurred)
 
-            pyramid.append(
-                levels
-            )
-
-            current = levels[
-                          self.scales
-                      ][::2, ::2]
+            pyramid.append(levels)
+            current = levels[self.scales][::2, ::2]
 
         return pyramid
 
-    def dog_pyramid(
-            self,
-            gaussian_pyramid
-    ):
+    def dog_pyramid(self, gaussian_pyramid):
         dog = []
 
         for octave in gaussian_pyramid:
             octave_dog = []
 
-            for i in range(
-                    len(octave) - 1
-            ):
-                diff = (
-                        octave[i + 1]
-                        - octave[i]
-                )
+            for i in range(len(octave) - 1):
+                diff = octave[i + 1] - octave[i]
 
-                octave_dog.append(
-                    diff
-                )
+                octave_dog.append(diff)
 
-            dog.append(
-                octave_dog
-            )
+            dog.append(octave_dog)
 
         return dog
 
@@ -99,9 +67,7 @@ class SIFTDetector:
             y: int,
             x: int
     ):
-        value = current[
-            y,
-            x
+        value = current[y, x
         ]
 
         cube = np.stack([
@@ -109,10 +75,12 @@ class SIFTDetector:
             y - 1:y + 2,
             x - 1:x + 2
             ],
+
             current[
             y - 1:y + 2,
             x - 1:x + 2
             ],
+
             next_[
             y - 1:y + 2,
             x - 1:x + 2
@@ -126,64 +94,29 @@ class SIFTDetector:
             13
         )
 
-        return (
-                value > neighbors.max()
-                or
-                value < neighbors.min()
-        )
+        return value > neighbors.max() or value < neighbors.min()
 
-    def detect(
-            self,
-            image: np.ndarray
-    ):
-        gaussian = self.gaussian_pyramid(
-            image
-        )
 
-        dog = self.dog_pyramid(
-            gaussian
-        )
+    def detect(self, image: np.ndarray):
+        gaussian = self.gaussian_pyramid(image)
+        dog = self.dog_pyramid(gaussian)
 
         keypoints = []
 
-        for octave_idx, octave in enumerate(
-                dog
-        ):
-            for scale in range(
-                    1,
-                    len(octave) - 1
-            ):
-                previous = octave[
-                    scale - 1
-                    ]
+        for octave_idx, octave in enumerate(dog):
+            for scale in range(1, len(octave) - 1):
+                previous = octave[scale - 1]
 
-                current = octave[
-                    scale
-                ]
-
-                next_ = octave[
-                    scale + 1
-                    ]
+                current = octave[scale]
+                next_ = octave[scale + 1]
 
                 h, w = current.shape
 
-                for y in range(
-                        1,
-                        h - 1
-                ):
-                    for x in range(
-                            1,
-                            w - 1
-                    ):
-                        value = current[
-                            y,
-                            x
-                        ]
+                for y in range(1, h - 1):
+                    for x in range(1, w - 1):
+                        value = current[y, x]
 
-                        if (
-                                abs(value)
-                                < self.threshold
-                        ):
+                        if abs(value) < self.threshold:
                             continue
 
                         if self.is_extremum(
@@ -193,9 +126,8 @@ class SIFTDetector:
                                 y,
                                 x
                         ):
-                            factor = (
-                                    2 ** octave_idx
-                            )
+                            factor = 2 ** octave_idx
+
 
                             keypoints.append(
                                 (

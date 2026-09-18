@@ -126,17 +126,12 @@ class Conv2D:
     def backward(self, grad_output):
         n, _, h, w = self.x.shape
 
-        _, _, out_h, out_w = (
-            grad_output.shape
-        )
+        _, _, out_h, out_w = grad_output.shape
 
-        grad_x_padded = np.zeros_like(
-            self.x_padded
-        )
 
-        self.grad_weight = np.zeros_like(
-            self.weight
-        )
+        grad_x_padded = np.zeros_like(self.x_padded)
+
+        self.grad_weight = np.zeros_like(self.weight)
 
         self.grad_bias = (
             np.zeros_like(self.bias)
@@ -167,9 +162,7 @@ class Conv2D:
                             x_pos:x_pos + self.kernel_size,
                         ]
 
-                        self.grad_weight[
-                            out_channel
-                        ] += patch * grad
+                        self.grad_weight[out_channel] += patch * grad
 
                         grad_x_padded[
                             batch,
@@ -236,9 +229,7 @@ if __name__ == "__main__":
         target,
     )
 
-    grad_x = conv.backward(
-        grad_output
-    )
+    grad_x = conv.backward(grad_output)
 
     print("NumPy")
     print("output:", y.shape)
