@@ -1,440 +1,1496 @@
 import math
+import random
+import re
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
 
+import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import Dataset, DataLoader
 
+
+def set_seed(seed: int = 42):
+    random.seed(42)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+set_seed(42)
 
 @dataclass
-class BERTConfig:
-    """
-    Minimal configuration for an educational BERT implementation.
-    Defaults are intentionally small so the model can be run on a CPU.
-    """
-
+class BertConfig:
     vocab_size: int
-    d_model: int = 128
-    n_heads: int = 4
-    d_ff: int = 512
-    num_layers: int = 4
-    max_seq_len: int = 128
+
+    hidden_size: int = 128
+    num_hidden_layers: int = 4
+    num_attention_heads: int = 4
+    intermediate_size: int = 512
+
+    max_position_embeddings: int = 128
     type_vocab_size: int = 2
-    dropout: float = 0.1
-    attention_dropout: float = 0.1
+
+    hidden_dropout_prob: float = 0.1
+    attention_probs_dropout_prob: float = 0.1
+
     layer_norm_eps: float = 1e-12
-    initializer_range: float = 0.02
-    pad_token_id: int = 0
 
-def make_padding_mask(
-    input_ids: torch.Tensor,
-    pad_token_id: int = 0
-) -> torch.Tensor:
-    """
-    Create a boolean self-attention mask.
+class Tokenizer:
+    PAD_TOKEN = "[PAD]"
+    UNK_TOKEN = "[UNK]"
+    CLS_TOKEN = "[CLS]"
+    SEP_TOKEN = "[SEP]"
+    MASK_TOKEN = "[MASK]"
 
-    Args:
-        input_ids:
-            Token IDs of shape (batch_size, seq_len).
-        pad_token_id:
-            ID of the [PAD] token.
+    def __init__(self):
+        self.special_tokens = [
+            self.PAD_TOKEN,
+            self.UNK_TOKEN,
+            self.CLS_TOKEN,
+            self.SEP_TOKEN,
+            self.MASK_TOKEN,
+        ]
 
-    Returns:
-        Boolean tensor of shape (batch_size, 1, 1, seq_len).
+        self.token_to_id = {}
+        self.id_to_token = {}
 
-        True  -> token may be attended to.
-        False -> token is padding and must be ignored.
-    """
+    def tokenize(self, text: str) -> list[str]:
+        pattern = (
+            r"\[(?:PAD|UNK|CLS|SEP|MASK)\]"
+            r"|[\w]+"
+            r"|[^\w\s]"
+        )
 
-    return (input_ids != pad_token_id).unsqueeze(1).unsqueeze(2)
+        tokens = re.findall(
+            pattern,
+            text,
+            flags=re.UNICODE
+        )
 
+        result = []
 
-class MultiHeadAttention(nn.Module):
-    """
-    Multi-Head Self-Attention used by BERT.
+        for token in tokens:
+            if token in self.special_tokens:
+                result.append(token)
+            else:
+                result.append(token.lower())
 
-    Input:
-        x: (B, L, D)
+        return result
 
-    Internally:
-        Q, K, V -> (B, H, L, D_head)
+    def build_vocab(self, texts: list[str]):
+        vocab = set()
 
-    Attention:
-        softmax(QK^T / sqrt(D_head)) V
-    """
+        for text in texts:
+            vocab.update(self.tokenize(text))
 
-    def __init__(
+        tokens = self.special_tokens + sorted(vocab)
+
+        self.token_to_id = {
+            token: idx
+            for idx, token in enumerate(tokens)
+        }
+
+        self.id_to_token = {
+            idx: token
+            for token, idx in self.token_to_id.items()
+        }
+
+    @property
+    def vocab_size(self):
+        return len(self.token_to_id)
+
+    @property
+    def pad_token_id(self):
+        return self.token_to_id[self.PAD_TOKEN]
+
+    @property
+    def unk_token_id(self):
+        return self.token_to_id[self.UNK_TOKEN]
+
+    @property
+    def cls_token_id(self):
+        return self.token_to_id[self.CLS_TOKEN]
+
+    @property
+    def sep_token_id(self):
+        return self.token_to_id[self.SEP_TOKEN]
+
+    @property
+    def mask_token_id(self):
+        return self.token_to_id[self.MASK_TOKEN]
+
+    def convert_tokens_to_ids(
             self,
-            d_model: int,
-            n_heads: int,
-            attention_dropout: float = 0.1
-    ):
+            tokens: list[str]
+    ) -> list[int]:
 
+        return [
+            self.token_to_id.get(
+                token,
+                self.unk_token_id
+            )
+            for token in tokens
+        ]
+
+    def convert_ids_to_tokens(self, ids) -> list[str]:
+        return [
+            self.id_to_token.get(
+                int(idx),
+                self.UNK_TOKEN
+            )
+            for idx in ids
+        ]
+
+    def encode(
+            self,
+            text_a: str,
+            text_b: Optional[str] = None,
+            max_length: int = 128
+    ):
+        tokens_a = self.tokenize(text_a)
+
+        tokens_b = None
+
+        if text_b is not None:
+            tokens_b = self.tokenize(text_b)
+
+        if tokens_b is None:
+            max_tokens = max_length - 2
+            tokens_a = tokens_a[:max_tokens]
+
+        else:
+            max_tokens = max_length - 3
+
+            while len(tokens_a) + len(tokens_b) > max_tokens:
+                if len(tokens_a) > len(tokens_b):
+                    tokens_a.pop()
+                else:
+                    tokens_b.pop()
+
+        tokens = [self.CLS_TOKEN]
+        token_type_ids = [0]
+
+        tokens.extend(tokens_a)
+        token_type_ids.extend([0] * len(tokens_a))
+
+        tokens.append(self.SEP_TOKEN)
+        token_type_ids.append(0)
+
+        if tokens_b is not None:
+            tokens.extend(tokens_b)
+            token_type_ids.extend([1] * len(tokens_b))
+
+            tokens.append(self.SEP_TOKEN)
+            token_type_ids.append(1)
+
+        input_ids = self.convert_tokens_to_ids(tokens)
+        attention_mask = [1] * len(input_ids)
+        padding_length = max_length - len(input_ids)
+
+        input_ids.extend(
+            [self.pad_token_id] * padding_length
+        )
+
+        token_type_ids.extend(
+            [0] * padding_length
+        )
+
+        attention_mask.extend(
+            [0] * padding_length
+        )
+
+        return {
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "attention_mask": attention_mask,
+        }
+
+class BertEmbeddings(nn.Module):
+    def __init__(self, config: BertConfig):
         super().__init__()
-        self.d_model = d_model
-        self.n_heads = n_heads
-        self.head_dim = d_model // n_heads
+
+        self.word_embeddings = nn.Embedding(
+            num_embeddings=config.vocab_size,
+            embedding_dim=config.hidden_size
+        )
+
+        self.position_embeddings = nn.Embedding(
+            num_embeddings=config.max_position_embeddings,
+            embedding_dim=config.hidden_size
+        )
+
+        self.token_type_embeddings = nn.Embedding(
+            num_embeddings=config.type_vocab_size,
+            embedding_dim=config.hidden_size
+        )
+
+        self.layer_norm = nn.LayerNorm(
+            config.hidden_size,
+            eps=config.layer_norm_eps
+        )
+
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+
+    def forward(
+            self,
+            input_ids: torch.Tensor,
+            token_type_ids: Optional[torch.Tensor] = None
+    ):
+        batch_size, seq_length = input_ids.shape
+
+        if token_type_ids is None:
+            token_type_ids = torch.zeros_like(input_ids)
+
+        position_ids = (
+            torch.arange(
+                seq_length,
+                device=input_ids.device
+            )
+            .unsqueeze(0)
+            .expand(
+                batch_size,
+                seq_length
+            )
+        )
+
+        word_embeddings = self.word_embeddings(input_ids)
+        position_embeddings = self.position_embeddings(position_ids)
+        token_type_embeddings = self.token_type_embeddings(token_type_ids)
+        embeddings = word_embeddings + position_embeddings + token_type_embeddings
+        embeddings = self.layer_norm(embeddings)
+        embeddings = self.dropout(embeddings)
+
+        return embeddings
+
+class BertSelfAttention(nn.Module):
+    def __init__(self, config: BertConfig):
+        super().__init__()
+
+        self.num_heads = config.num_attention_heads
+        self.head_dim = config.hidden_size // config.num_attention_heads
+        self.all_head_size = self.num_heads * self.head_dim
         self.scale = self.head_dim ** -0.5
 
-        self.query = nn.Linear(d_model, d_model)
-        self.key = nn.Linear(d_model, d_model)
-        self.value = nn.Linear(d_model, d_model)
-        self.output = nn.Linear(d_model, d_model)
-        self.attention_dropout = nn.Dropout(attention_dropout)
+        self.query = nn.Linear(
+            config.hidden_size,
+            self.all_head_size
+        )
 
-    def _split_heads(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        (B, L, D)
-            ->
-        (B, H, L, D_head)
-        """
+        self.key = nn.Linear(
+            config.hidden_size,
+            self.all_head_size
+        )
 
-        batch_size, seq_len, _ = x.shape
+        self.value = nn.Linear(
+            config.hidden_size,
+            self.all_head_size
+        )
+
+        self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
+
+    def transpose_for_scores(
+            self,
+            x: torch.Tensor
+    ):
+        batch_size, seq_length, _ = x.shape
 
         x = x.view(
             batch_size,
-            seq_len,
-            self.n_heads,
+            seq_length,
+            self.num_heads,
             self.head_dim
         )
 
-        return x.transpose(1, 2)
+        return x.permute(0, 2, 1, 3)
 
-    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """
-        Forward pass of multi-head attention.
+    def forward(
+            self,
+            hidden_states: torch.Tensor,
+            attention_mask: Optional[torch.Tensor] = None
+    ):
+        query = self.query(hidden_states)
+        key = self.key(hidden_states)
+        value = self.value(hidden_states)
 
-        Steps:
-            1. Compute Q, K, V matrices via linear layers
-            2. Reshape and split into heads
-            3. Compute scaled dot-product attention
-            4. Apply mask (if provided)
-            5. Softmax over scores → attention weights
-            6. Multiply weights by V to get context vectors
-            7. Concatenate all heads back together
-            8. Final linear projection through self.o
+        query = self.transpose_for_scores(query)
+        key = self.transpose_for_scores(key)
+        value = self.transpose_for_scores(value)
 
-        Args:
-            x (Tensor): Input tensor of shape (B, seq_len, d_model)
-            mask (Tensor, optional): Attention mask broadcastable to
-                                             (B, n_heads, seq_len, seq_len)
+        attention_scores = torch.matmul(
+            query,
+            key.transpose(-1, -2)
+        )
 
-        Returns:
-            Tensor of shape (B, seq_len, d_model)
-        """
+        attention_scores = attention_scores * self.scale
 
-        b, seq_len, _ = x.size()
-        Q = self._shape(self.q(x))
-        K = self._shape(self.k(x))
-        V = self._shape(self.v(x))
+        if attention_mask is not None:
+            attention_scores = (
+                attention_scores.masked_fill(
+                    attention_mask == 0,
+                    -1e4
+                )
+            )
 
-        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.d_k)
+        attention_probs = F.softmax(attention_scores, dim=-1)
+        attention_probs = self.dropout(attention_probs)
 
-        if mask is not None:
-            scores = scores.masked_fill(~mask, float("-inf"))
+        context = torch.matmul(attention_probs, value)
 
-        attn = F.softmax(scores, dim=-1)
-        attn = self.dropout(attn)
-        context = torch.matmul(attn, V)
-        context = context.transpose(1, 2).contiguous().view(b, seq_len, self.d_model)
-        return self.o(context)
+        context = context.permute(
+            0,
+            2,
+            1,
+            3
+        ).contiguous()
 
-class FeedForward(nn.Module):
-    """
-    Position-wise Feed-Forward Network (FFN) used inside Transformer blocks.
+        batch_size, seq_length, _, _ = context.shape
 
-    Applies:
-        Linear -> GELU -> Dropout -> Linear -> Dropout
+        context = context.view(
+            batch_size,
+            seq_length,
+            self.all_head_size
+        )
 
-    This module transforms each token embedding independently,
-    expanding dimensionality to d_ff and projecting back to d_model.
-    """
+        return (
+            context,
+            attention_probs
+        )
 
-    def __init__(self, d_model: int, d_ff: int, dropout: float = 0.1):
-        """
-        Initializes the feed-forward network.
-
-        Args:
-            d_model (int): Dimensionality of the input and output embeddings.
-            d_ff (int): Dimensionality of the intermediate hidden layer.
-            dropout (float): Dropout probability applied after activations.
-
-        Components:
-            w1: Expands dimension from d_model → d_ff.
-            w2: Projects back from d_ff → d_model.
-            dropout: Helps regularize the network and prevent overfitting.
-        """
-
+class BertSelfOutput(nn.Module):
+    def __init__(self, config: BertConfig):
         super().__init__()
-        self.w1 = nn.Linear(d_model, d_ff)
-        self.w2 = nn.Linear(d_ff, d_model)
-        self.dropout = nn.Dropout(dropout)
-        nn.init.xavier_normal_(self.w1.weight)
-        nn.init.xavier_normal_(self.w2.weight)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass of the FFN.
+        self.dense = nn.Linear(
+            config.hidden_size,
+            config.hidden_size
+        )
 
-        Steps:
-            1. Linear projection to higher dimension.
-            2. GELU non-linearity.
-            3. Dropout to reduce overfitting.
-            4. Linear projection back to d_model.
-            5. Another dropout for regularization.
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        Args:
-            x (Tensor): Input tensor of shape (B, seq_len, d_model)
+        self.layer_norm = nn.LayerNorm(
+            config.hidden_size,
+            eps=config.layer_norm_eps
+        )
 
-        Returns:
-            Tensor: Output tensor of shape (B, seq_len, d_model)
-        """
+    def forward(
+            self,
+            hidden_states: torch.Tensor,
+            input_tensor: torch.Tensor
+    ) -> torch.Tensor:
 
-        x = self.w1(x)
-        x = F.gelu(x)
-        x = self.dropout(x)
-        x = self.w2(x)
-        x = self.dropout(x)
-        return x
+        hidden_states = self.dense(hidden_states)
+        hidden_states = self.dropout(hidden_states)
+        hidden_states = hidden_states + input_tensor
+        hidden_states = self.layer_norm(hidden_states)
+        return hidden_states
 
-class TransformerBlock(nn.Module):
-    """
-    A single Transformer block consisting of:
-        - LayerNorm + Multi-Head Self-Attention
-        - Residual connection
-        - LayerNorm + Feed-Forward Network (FFN)
-        - Another residual connection
-
-    This is the core building block used in Transformer encoder/decoder stacks.
-    """
-
-    def __init__(self, d_model: int, n_heads: int, d_ff: int, dropout: float = 0.1):
-        """
-        Initializes all components of the Transformer block.
-
-        Args:
-            d_model (int): Dimensionality of the model (embedding size).
-            n_heads (int): Number of attention heads.
-            d_ff (int): Dimensionality of the intermediate FFN layer.
-            dropout (float): Dropout probability used throughout the block.
-        """
-
+class BertAttention(nn.Module):
+    def __init__(self, config: BertConfig):
         super().__init__()
-        self.norm1 = nn.LayerNorm(d_model, eps=1e-6)
-        self.attn = MultiHeadAttention(d_model, n_heads, dropout)
-        self.norm2 = nn.LayerNorm(d_model, eps=1e-6)
-        self.ff = FeedForward(d_model, d_ff, dropout)
-        self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """
-        Forward pass through the Transformer block.
+        self.self_attention = BertSelfAttention(config)
+        self.output = BertSelfOutput(config)
 
-        Args:
-            x (Tensor): Input tensor of shape (B, seq_len, d_model).
-            mask (Tensor, optional): Attention mask (e.g., causal or padding mask).
+    def forward(
+            self,
+            hidden_states: torch.Tensor,
+            attention_mask: Optional[torch.Tensor] = None
+    ):
+        self_output, attention_probs = (
+            self.self_attention(
+                hidden_states,
+                attention_mask
+            )
+        )
 
-        Returns:
-            Tensor: Output tensor with the same shape as input.
-        """
+        attention_output = self.output(self_output, hidden_states)
 
-        y = self.norm1(x)
-        y_attn = self.attn(y, mask)
-        x = x + self.dropout(y_attn)
-        z = self.norm2(x)
-        z_ff = self.ff(z)
-        x = x + self.dropout(z_ff)
-        return x
+        return (
+            attention_output,
+            attention_probs
+        )
 
-class BERTModel(nn.Module):
-    """
-    Simplified BERT-style Transformer Encoder.
+class GELU(nn.Module):
 
-    Components:
-    - Token embeddings
-    - Segment embeddings (for sentence pairs)
-    - Positional embeddings
-    - Stack of Transformer blocks (attention + feed-forward)
-    - Final LayerNorm
-    """
+    def forward(self, x: torch.Tensor):
+        return 0.5 * x * (
+            1.0
+            + torch.erf(
+                x / math.sqrt(2.0)
+            )
+        )
 
-    def __init__(self, vocab_size: int, d_model: int = 128, n_heads: int = 4, d_ff: int = 512,
-                 num_layers: int = 4, max_seq_len: int = 64, dropout: float = 0.1, pad_token_id: int = 0):
-        """
-        Initialize BERT model.
+class BertIntermediate(nn.Module):
 
-        Args:
-            vocab_size: Size of the vocabulary.
-            d_model: Hidden embedding dimension.
-            n_heads: Number of attention heads.
-            d_ff: Feed-forward hidden dimension.
-            num_layers: Number of Transformer blocks.
-            max_seq_len: Maximum sequence length for positional embeddings.
-            dropout: Dropout probability.
-            pad_token_id: ID of the padding token.
-        """
-
+    def __init__(self, config: BertConfig):
         super().__init__()
-        self.pad_token_id = pad_token_id
-        self.embed  = nn.Embedding(vocab_size, d_model)
-        self.seg_embed = nn.Embedding(2, d_model)
-        self.pos_embed = nn.Embedding(max_seq_len, d_model)
-        self.layers = nn.ModuleList([TransformerBlock(d_model, n_heads, d_ff, dropout)
-                                     for _ in range(num_layers)])
-        self.ln_f = nn.LayerNorm(d_model, eps=1e-6)
-        nn.init.xavier_normal_(self.embed.weight)
 
-        self.mlm_head = nn.Linear(d_model, vocab_size)
-        nn.init.xavier_normal_(self.mlm_head.weight)
+        self.dense = nn.Linear(
+            config.hidden_size,
+            config.intermediate_size
+        )
 
-    def forward(self, x: torch.Tensor, seg: Optional[torch.Tensor] = None,
-                mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """
-        Forward pass of the BERT encoder.
+        self.activation = GELU()
 
-        Args:
-            x: Input tensor of token IDs, shape (batch_size, seq_len)
-            seg: Optional segment IDs (0 or 1) for sentence pairs, shape (batch_size, seq_len)
-            mask: Optional attention mask to ignore padding tokens, shape (batch_size, 1, 1, seq_len)
+    def forward(
+            self,
+            hidden_states: torch.Tensor
+    ):
+        hidden_states = self.dense(hidden_states)
+        hidden_states = self.activation(hidden_states)
+        return hidden_states
 
-        Returns:
-            Tensor of shape (batch_size, seq_len, d_model), the final hidden states
-        """
+class BertOutput(nn.Module):
 
-        b, seq_len = x.size()
-        positions = torch.arange(seq_len, device=x.device).unsqueeze(0).expand(b, seq_len)
-        x = self.embed(x) + self.pos_embed(positions)
+    def __init__(self, config: BertConfig):
+        super().__init__()
 
-        if seg is not None:
-            x = x + self.seg_embed(seg)
+        self.dense = nn.Linear(
+            config.intermediate_size,
+            config.hidden_size
+        )
 
-        if mask is not None:
-            mask = make_padding_mask(x, self.pad_token_id)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+
+        self.layer_norm = nn.LayerNorm(
+            config.hidden_size,
+            eps=config.layer_norm_eps
+        )
+
+    def forward(
+            self,
+            hidden_states: torch.Tensor,
+            input_tensor: torch.Tensor
+    ):
+        hidden_states = self.dense(hidden_states)
+        hidden_states = self.dropout(hidden_states)
+        hidden_states = hidden_states + input_tensor
+        hidden_states = self.layer_norm(hidden_states)
+
+        return hidden_states
+
+class BertLayer(nn.Module):
+
+    def __init__(self, config: BertConfig):
+        super().__init__()
+
+        self.attention = BertAttention(config)
+        self.intermediate = BertIntermediate(config)
+        self.output = BertOutput(config)
+
+    def forward(
+            self,
+            hidden_states: torch.Tensor,
+            attention_mask: Optional[torch.Tensor] = None
+    ):
+        attention_output, attention_probs = (
+            self.attention(
+                hidden_states,
+                attention_mask
+            )
+        )
+
+        intermediate_output = self.intermediate(attention_output)
+
+        layer_output = self.output(
+            intermediate_output,
+            attention_output
+        )
+
+        return (
+            layer_output,
+            attention_probs
+        )
+
+class BertEncoder(nn.Module):
+
+    def __init__(self, config: BertConfig):
+        super().__init__()
+
+        self.layers = nn.ModuleList(
+            [
+                BertLayer(config)
+                for _ in range(
+                    config.num_hidden_layers
+                )
+            ]
+        )
+
+    def forward(
+            self,
+            hidden_states: torch.Tensor,
+            attention_mask: Optional[torch.Tensor] = None,
+            output_attentions: bool = False
+    ):
+        attentions = []
 
         for layer in self.layers:
-            x = layer(x, mask)
+            hidden_states, attention_probs = (
+                layer(
+                    hidden_states,
+                    attention_mask
+                )
+            )
 
-        x = self.ln_f(x)
-        return x
+            if output_attentions:
+                attentions.append(
+                    attention_probs
+                )
 
-class BERTClassifier(nn.Module):
-    """
-    BERT-based model for text classification with optional Masked Language Modeling (MLM) head.
+        return (
+            hidden_states,
+            attentions
+        )
 
-    Components:
-    - BERT encoder (bidirectional Transformer)
-    - Classification head ([CLS] token used)
-    - Optional MLM head for pretraining tasks
-    """
+class BertPooler(nn.Module):
 
-    def __init__(self, vocab_size: int, num_classes: int, max_seq_len: int = 64, d_model: int = 128,
-                 n_heads: int = 4, d_ff: int = 512,
-                 num_layers: int = 4, dropout: float = 0.1, pad_token_id: int = 0):
-        """
-        Initialize the BERT classifier.
-
-        Args:
-            vocab_size: Size of the vocabulary.
-            num_classes: Number of output classes for classification.
-            max_seq_len: Maximum sequence length.
-            d_model: Hidden embedding dimension.
-            n_heads: Number of attention heads.
-            d_ff: Hidden dimension for feed-forward networks.
-            num_layers: Number of Transformer blocks in the encoder.
-            dropout: Dropout probability.
-            pad_token_id: ID of the padding token.
-        """
-
+    def __init__(self, config: BertConfig):
         super().__init__()
-        self.bert = BERTModel(vocab_size, d_model, n_heads, d_ff, num_layers, max_seq_len, dropout, pad_token_id)
-        self.cls_head = nn.Linear(d_model, num_classes)
-        nn.init.xavier_normal_(self.cls_head.weight)
-        self.mlm_head = self.bert.mlm_head
 
-    def forward(self, x: torch.Tensor, seg: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Forward pass of the classifier.
+        self.dense = nn.Linear(
+            config.hidden_size,
+            config.hidden_size
+        )
 
-        Args:
-            x: Input token IDs, shape (batch_size, seq_len)
-            seg: Optional segment IDs (0 or 1), shape (batch_size, seq_len)
+        self.activation = nn.Tanh()
 
-        Returns:
-            Tuple:
-                - logits_cls: Classification logits for each sample, shape (batch_size, num_classes)
-                - logits_mlm: Optional MLM logits for each token, shape (batch_size, seq_len, vocab_size)
-        """
+    def forward(
+            self,
+            hidden_states: torch.Tensor
+    ):
+        cls_token = hidden_states[:, 0]
 
-        enc = self.bert(x, seg)
-        cls_token = enc[:, 0, :]
-        logits_cls = self.cls_head(cls_token)
-        logits_mlm = self.mlm_head(enc)
-        return logits_cls, logits_mlm
+        pooled_output = self.dense(cls_token)
+        pooled_output = self.activation(pooled_output)
 
-if __name__ == "__main__":
-    vocab_size = 100
-    num_classes = 3
-    pad = 0
-    seq_len = 12
-    samples = 500
-    batch_size = 16
-    mask_prob = 0.15
+        return pooled_output
 
-    X = torch.randint(1, vocab_size, (samples, seq_len))
-    y = torch.randint(0, num_classes, (samples,))
+class BertModel(nn.Module):
 
-    X_mlm = X.clone()
-    rand_mask = torch.rand_like(X, dtype=torch.float) < mask_prob
-    X_mlm[rand_mask] = 0
+    def __init__(self, config: BertConfig):
+        super().__init__()
 
-    dataset = TensorDataset(X, y, X_mlm, rand_mask)
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        self.config = config
 
-    model = BERTClassifier(vocab_size=vocab_size, num_classes=num_classes, max_seq_len=seq_len)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
+        self.embeddings = BertEmbeddings(
+            config
+        )
 
-    criterion_cls = nn.CrossEntropyLoss(ignore_index=pad)
-    criterion_mlm = nn.CrossEntropyLoss(ignore_index=pad)
-    optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
+        self.encoder = BertEncoder(
+            config
+        )
 
-    model.train()
-    for epoch in range(5):
+        self.pooler = BertPooler(
+            config
+        )
+
+        self.apply(self._init_weights)
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            nn.init.normal_(
+                module.weight,
+                mean=0.0,
+                std=0.02
+            )
+
+            if module.bias is not None:
+                nn.init.zeros_(module.bias)
+
+        elif isinstance(module, nn.Embedding):
+            nn.init.normal_(
+                module.weight,
+                mean=0.0,
+                std=0.02
+            )
+
+        elif isinstance(module, nn.LayerNorm):
+            nn.init.ones_(module.weight)
+            nn.init.zeros_(module.bias)
+
+    def forward(
+            self,
+            input_ids: torch.Tensor,
+            token_type_ids: Optional[torch.Tensor] = None,
+            attention_mask: Optional[torch.Tensor] = None,
+            output_attentions: bool = False
+    ):
+        embedding_output = self.embeddings(
+            input_ids,
+            token_type_ids
+        )
+
+        if attention_mask is not None:
+            extended_attention_mask = (
+                attention_mask[
+                    :,
+                    None,
+                    None,
+                    :
+                ]
+            )
+        else:
+            extended_attention_mask = None
+
+        sequence_output, attentions = (
+            self.encoder(
+                embedding_output,
+                extended_attention_mask,
+                output_attentions
+            )
+        )
+
+        pooled_output = self.pooler(sequence_output)
+
+        return {
+            "last_hidden_state": sequence_output,
+            "pooler_output": pooled_output,
+            "attentions": attentions
+        }
+
+
+class BertPredictionHeadTransform(nn.Module):
+
+    def __init__(self, config: BertConfig):
+        super().__init__()
+
+        self.dense = nn.Linear(
+            config.hidden_size,
+            config.hidden_size
+        )
+
+        self.activation = GELU()
+
+        self.layer_norm = nn.LayerNorm(
+            config.hidden_size,
+            eps=config.layer_norm_eps
+        )
+
+    def forward(self, hidden_states: torch.Tensor):
+        hidden_states = self.dense(hidden_states)
+        hidden_states = self.activation(hidden_states)
+        hidden_states = self.layer_norm(hidden_states)
+
+        return hidden_states
+
+
+class BertMLMHead(nn.Module):
+
+    def __init__(self, config: BertConfig):
+        super().__init__()
+
+        self.transform = BertPredictionHeadTransform(config)
+
+        self.decoder = nn.Linear(
+            config.hidden_size,
+            config.vocab_size,
+            bias=False
+        )
+
+        self.bias = nn.Parameter(
+            torch.zeros(
+                config.vocab_size
+            )
+        )
+
+    def forward(self, hidden_states):
+        hidden_states = self.transform(hidden_states)
+        logits = self.decoder(hidden_states)
+        logits = logits + self.bias
+        return logits
+
+class BertNSPHead(nn.Module):
+
+    def __init__(self, config: BertConfig):
+        super().__init__()
+
+        self.classifier = nn.Linear(
+            config.hidden_size,
+            2
+        )
+
+    def forward(self, pooled_output):
+        return self.classifier(pooled_output)
+
+class BertForPreTraining(nn.Module):
+
+    def __init__(self, config: BertConfig):
+        super().__init__()
+
+        self.config = config
+
+        self.bert = BertModel(config)
+        self.mlm_head = BertMLMHead(config)
+        self.nsp_head = BertNSPHead(config)
+
+        self.mlm_head.decoder.weight = (
+            self.bert
+            .embeddings
+            .word_embeddings
+            .weight
+        )
+
+    def forward(
+            self,
+            input_ids: torch.Tensor,
+            token_type_ids: Optional[torch.Tensor] = None,
+            attention_mask: Optional[torch.Tensor] = None,
+            mlm_labels: Optional[torch.Tensor] = None,
+            nsp_labels: Optional[torch.Tensor] = None
+    ):
+        outputs = self.bert(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask
+        )
+
+        sequence_output = outputs["last_hidden_state"]
+        pooled_output = outputs["pooler_output"]
+
+        prediction_logits = self.mlm_head(
+            sequence_output
+        )
+
+        sequence_relationship_logits = self.nsp_head(
+            pooled_output
+        )
+
+        total_loss = None
+        mlm_loss = None
+        nsp_loss = None
+
+        if mlm_labels is not None:
+            mlm_loss = F.cross_entropy(
+                prediction_logits.view(
+                    -1,
+                    self.config.vocab_size
+                ),
+                mlm_labels.view(-1),
+                ignore_index=-100
+            )
+
+        if nsp_labels is not None:
+            nsp_loss = F.cross_entropy(
+                sequence_relationship_logits,
+                nsp_labels
+            )
+
+        if (
+            mlm_loss is not None
+            and nsp_loss is not None
+        ):
+            total_loss = (
+                mlm_loss
+                + nsp_loss
+            )
+
+        elif mlm_loss is not None:
+            total_loss = mlm_loss
+
+        elif nsp_loss is not None:
+            total_loss = nsp_loss
+
+        return {
+            "loss": total_loss,
+            "mlm_loss": mlm_loss,
+            "nsp_loss": nsp_loss,
+            "prediction_logits": prediction_logits,
+            "nsp_logits": sequence_relationship_logits
+        }
+
+class BertForSequenceClassification(nn.Module):
+
+    def __init__(
+            self,
+            config: BertConfig,
+            num_classes: int
+    ):
+        super().__init__()
+
+        self.bert = BertModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.classifier = nn.Linear(
+            config.hidden_size,
+            num_classes
+        )
+
+    def forward(
+            self,
+            input_ids: torch.Tensor,
+            token_type_ids: Optional[torch.Tensor] = None,
+            attention_mask: Optional[torch.Tensor] = None,
+            labels: Optional[torch.Tensor] = None
+    ):
+        outputs = self.bert(
+            input_ids,
+            token_type_ids,
+            attention_mask
+        )
+
+        pooled_output = outputs["pooler_output"]
+        pooled_output = self.dropout(pooled_output)
+        logits = self.classifier(pooled_output)
+
+        loss = None
+
+        if labels is not None:
+            loss = F.cross_entropy(
+                logits,
+                labels
+            )
+
+        return {
+            "loss": loss,
+            "logits": logits
+        }
+
+def create_mlm_input(
+        input_ids: np.ndarray,
+        tokenizer: Tokenizer,
+        mlm_probability: float = 0.15,
+        rng: Optional[np.random.Generator] = None
+):
+    if rng is None:
+        rng = np.random.default_rng()
+
+    input_ids = input_ids.copy()
+
+    labels = np.full(
+        input_ids.shape,
+        -100,
+        dtype=np.int64
+    )
+
+    special_ids = {
+        tokenizer.pad_token_id,
+        tokenizer.cls_token_id,
+        tokenizer.sep_token_id,
+        tokenizer.mask_token_id,
+    }
+
+    candidate_indices = [
+        i
+        for i, token_id
+        in enumerate(input_ids)
+        if int(token_id)
+        not in special_ids
+    ]
+
+    if not candidate_indices:
+        return (
+            input_ids,
+            labels
+        )
+
+    selected_indices = [
+        idx
+        for idx in candidate_indices
+        if rng.random()
+        < mlm_probability
+    ]
+
+    if not selected_indices:
+        selected_indices = [
+            int(
+                rng.choice(
+                    candidate_indices
+                )
+            )
+        ]
+
+    for index in selected_indices:
+        original_token = int(
+            input_ids[index]
+        )
+
+        labels[index] = original_token
+        probability = rng.random()
+
+        if probability < 0.8:
+            input_ids[index] = (
+                tokenizer.mask_token_id
+            )
+
+        elif probability < 0.9:
+            input_ids[index] = (
+                rng.integers(
+                    0,
+                    tokenizer.vocab_size
+                )
+            )
+
+        else:
+            input_ids[index] = (
+                original_token
+            )
+
+    return (
+        input_ids,
+        labels
+    )
+
+class BertPretrainingDataset(Dataset):
+
+    def __init__(
+            self,
+            sentences: list[str],
+            tokenizer: Tokenizer,
+            max_length: int = 32,
+            mlm_probability: float = 0.15,
+            seed: int = 42
+    ):
+        self.sentences = sentences
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+        self.mlm_probability = mlm_probability
+
+        self.rng = np.random.default_rng(
+            seed
+        )
+
+        self.examples = []
+
+        self._build_examples()
+
+    def _build_examples(self):
+        n = len(
+            self.sentences
+        )
+
+        for i in range(n - 1):
+            self.examples.append(
+                (
+                    self.sentences[i],
+                    self.sentences[i + 1],
+                    1
+                )
+            )
+
+            candidates = [
+                j
+                for j in range(n)
+                if j != i + 1
+                and j != i
+            ]
+
+            random_index = int(
+                self.rng.choice(
+                    candidates
+                )
+            )
+
+            self.examples.append(
+                (
+                    self.sentences[i],
+                    self.sentences[random_index],
+                    0
+                )
+            )
+
+    def __len__(self):
+        return len(self.examples)
+
+    def __getitem__(self,
+            index
+    ):
+        text_a, text_b, nsp_label = (
+            self.examples[index]
+        )
+
+        encoded = self.tokenizer.encode(
+            text_a=text_a,
+            text_b=text_b,
+            max_length=self.max_length
+        )
+
+        input_ids = np.array(
+            encoded["input_ids"],
+            dtype=np.int64
+        )
+
+        masked_input_ids, mlm_labels = (
+            create_mlm_input(
+                input_ids,
+                tokenizer=self.tokenizer,
+                mlm_probability=self.mlm_probability,
+                rng=self.rng
+            )
+        )
+
+        return {
+            "input_ids": torch.tensor(
+                masked_input_ids,
+                dtype=torch.long
+            ),
+            "token_type_ids": torch.tensor(
+                encoded["token_type_ids"],
+                dtype=torch.long
+            ),
+            "attention_mask": torch.tensor(
+                encoded["attention_mask"],
+                dtype=torch.long
+            ),
+            "mlm_labels": torch.tensor(
+                mlm_labels,
+                dtype=torch.long
+            ),
+            "nsp_labels": torch.tensor(
+                nsp_label,
+                dtype=torch.long
+            ),
+        }
+
+
+def train(
+        model: BertForPreTraining,
+        dataloader: DataLoader,
+        device: torch.device,
+        epochs: int = 10,
+        learning_rate: float = 3e-4
+):
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=learning_rate,
+        weight_decay=0.01
+    )
+
+    model.to(
+        device
+    )
+
+    for epoch in range(
+        epochs
+    ):
+        model.train()
+
         total_loss = 0.0
-        for batch_x, batch_y, batch_mlm_x, batch_mask in loader:
-            batch_x = batch_x.to(device)
-            batch_y = batch_y.to(device)
-            batch_mlm_x = batch_mlm_x.to(device)
-            batch_mask = batch_mask.to(device)
+        total_mlm_loss = 0.0
+        total_nsp_loss = 0.0
 
-            logits_cls, logits_mlm = model(batch_x)
-            loss_cls = criterion_cls(logits_cls, batch_y)
+        for batch in dataloader:
+            input_ids = batch[
+                "input_ids"
+            ].to(device)
 
-            logits_mlm_flat = logits_mlm.view(-1, vocab_size)
-            target_mlm_flat = batch_x.view(-1)
-            mask_flat = batch_mask.view(-1).bool()
+            token_type_ids = batch[
+                "token_type_ids"
+            ].to(device)
 
-            loss_mlm = criterion_mlm(logits_mlm_flat[mask_flat], target_mlm_flat[mask_flat])
+            attention_mask = batch[
+                "attention_mask"
+            ].to(device)
 
-            loss = loss_cls + loss_mlm
+            mlm_labels = batch[
+                "mlm_labels"
+            ].to(device)
+
+            nsp_labels = batch[
+                "nsp_labels"
+            ].to(device)
 
             optimizer.zero_grad()
+
+            outputs = model(
+                input_ids=input_ids,
+                token_type_ids=token_type_ids,
+                attention_mask=attention_mask,
+                mlm_labels=mlm_labels,
+                nsp_labels=nsp_labels
+            )
+
+            loss = outputs[
+                "loss"
+            ]
+
             loss.backward()
+
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(),
+                max_norm=1.0
+            )
+
             optimizer.step()
-            total_loss += loss.item()
 
-        print(f"Epoch {epoch + 1} Loss: {total_loss / len(loader):.4f}")
+            total_loss += (
+                loss.item()
+            )
 
+            total_mlm_loss += (
+                outputs[
+                    "mlm_loss"
+                ].item()
+            )
+
+            total_nsp_loss += (
+                outputs[
+                    "nsp_loss"
+                ].item()
+            )
+
+        batches = len(
+            dataloader
+        )
+
+        print(
+            f"Epoch "
+            f"{epoch + 1:02d}/{epochs} | "
+            f"Loss: "
+            f"{total_loss / batches:.4f} | "
+            f"MLM: "
+            f"{total_mlm_loss / batches:.4f} | "
+            f"NSP: "
+            f"{total_nsp_loss / batches:.4f}"
+        )
+
+
+@torch.no_grad()
+def predict_mask(
+        model: BertForPreTraining,
+        tokenizer: Tokenizer,
+        text: str,
+        device: torch.device,
+        max_length: int,
+        top_k: int = 5
+):
     model.eval()
-    correct = 0
-    with torch.no_grad():
-        for batch_x, batch_y, _, _ in loader:
-            batch_x = batch_x.to(device)
-            batch_y = batch_y.to(device)
-            logits_cls, _ = model(batch_x)
-            preds = logits_cls.argmax(dim=-1)
-            correct += (preds == batch_y).sum().item()
 
-    print("Train Accuracy:", correct / samples)
+    encoded = tokenizer.encode(
+        text_a=text,
+        max_length=max_length
+    )
+
+    input_ids = torch.tensor(
+        [
+            encoded[
+                "input_ids"
+            ]
+        ],
+        dtype=torch.long,
+        device=device
+    )
+
+    token_type_ids = torch.tensor(
+        [
+            encoded[
+                "token_type_ids"
+            ]
+        ],
+        dtype=torch.long,
+        device=device
+    )
+
+    attention_mask = torch.tensor(
+        [
+            encoded[
+                "attention_mask"
+            ]
+        ],
+        dtype=torch.long,
+        device=device
+    )
+
+    outputs = model(
+        input_ids=input_ids,
+        token_type_ids=token_type_ids,
+        attention_mask=attention_mask
+    )
+
+    logits = outputs[
+        "prediction_logits"
+    ]
+
+    mask_positions = (
+        input_ids[0]
+        == tokenizer.mask_token_id
+    ).nonzero(
+        as_tuple=False
+    ).flatten()
+
+    if len(mask_positions) == 0:
+        print(
+            "В предложении нет [MASK]."
+        )
+        return
+
+    for position in mask_positions:
+        token_logits = logits[
+            0,
+            position
+        ]
+
+        probabilities = F.softmax(
+            token_logits,
+            dim=-1
+        )
+
+        top_probs, top_ids = torch.topk(
+            probabilities,
+            k=min(
+                top_k,
+                tokenizer.vocab_size
+            )
+        )
+
+        print(
+            "\n[MASK] predictions:"
+        )
+
+        for prob, token_id in zip(
+            top_probs,
+            top_ids
+        ):
+            token = tokenizer.id_to_token[
+                int(token_id)
+            ]
+
+            print(
+                f"{token:15s} "
+                f"{float(prob):.4f}"
+            )
+
+
+@torch.no_grad()
+def predict_next_sentence(
+        model: BertForPreTraining,
+        tokenizer: Tokenizer,
+        sentence_a: str,
+        sentence_b: str,
+        device: torch.device,
+        max_length: int
+):
+    model.eval()
+
+    encoded = tokenizer.encode(
+        text_a=sentence_a,
+        text_b=sentence_b,
+        max_length=max_length
+    )
+
+    input_ids = torch.tensor(
+        [encoded["input_ids"]],
+        dtype=torch.long,
+        device=device
+    )
+
+    token_type_ids = torch.tensor(
+        [encoded["token_type_ids"]],
+        dtype=torch.long,
+        device=device
+    )
+
+    attention_mask = torch.tensor(
+        [encoded["attention_mask"]],
+        dtype=torch.long,
+        device=device
+    )
+
+    outputs = model(
+        input_ids=input_ids,
+        token_type_ids=token_type_ids,
+        attention_mask=attention_mask
+    )
+
+    logits = outputs[
+        "nsp_logits"
+    ]
+
+    probabilities = F.softmax(
+        logits,
+        dim=-1
+    )
+
+    not_next_probability = float(
+        probabilities[
+            0,
+            0
+        ]
+    )
+
+    is_next_probability = float(
+        probabilities[
+            0,
+            1
+        ]
+    )
+
+    print(
+        "\nNSP:"
+    )
+
+    print(
+        f"NotNext: "
+        f"{not_next_probability:.4f}"
+    )
+
+    print(
+        f"IsNext:  "
+        f"{is_next_probability:.4f}"
+    )
+
+def count_parameters(
+        model: nn.Module
+):
+    return sum(
+        p.numel()
+        for p in model.parameters()
+        if p.requires_grad
+    )
+
+
+def main():
+    sentences = [
+        "машинное обучение позволяет находить закономерности в данных",
+        "нейронные сети являются одним из методов машинного обучения",
+        "трансформеры используют механизм внимания",
+        "механизм внимания позволяет учитывать контекст слов",
+        "bert является моделью на основе transformer encoder",
+        "bert использует двунаправленное внимание",
+        "модель анализирует левый и правый контекст слова",
+        "masked language modeling используется для обучения bert",
+        "некоторые токены заменяются специальным токеном mask",
+        "модель должна восстановить исходные токены",
+        "self attention использует query key и value",
+        "attention вычисляет сходство между токенами",
+        "multi head attention использует несколько голов внимания",
+        "каждая голова может изучать различные зависимости",
+        "feed forward network обрабатывает представление каждого токена",
+        "residual connection помогает обучать глубокие нейронные сети",
+        "layer normalization стабилизирует процесс обучения",
+        "позиционные эмбеддинги содержат информацию о позиции токена",
+        "segment embeddings позволяют различать два предложения",
+        "токен cls используется как представление всей последовательности",
+    ]
+
+    tokenizer = Tokenizer()
+    tokenizer.build_vocab(
+        sentences
+    )
+
+    print(
+        "Vocabulary size:",
+        tokenizer.vocab_size
+    )
+
+    max_length = 32
+
+    config = BertConfig(
+        vocab_size=tokenizer.vocab_size,
+        hidden_size=128,
+        num_hidden_layers=4,
+        num_attention_heads=4,
+        intermediate_size=512,
+        max_position_embeddings=max_length,
+        type_vocab_size=2,
+        hidden_dropout_prob=0.1,
+        attention_probs_dropout_prob=0.1,
+    )
+
+    dataset = BertPretrainingDataset(
+        sentences=sentences,
+        tokenizer=tokenizer,
+        max_length=max_length,
+        mlm_probability=0.15
+    )
+
+    dataloader = DataLoader(
+        dataset,
+        batch_size=8,
+        shuffle=True
+    )
+
+    model = BertForPreTraining(
+        config
+    )
+
+    print(
+        "Trainable parameters:",
+        f"{count_parameters(model):,}"
+    )
+
+    device = torch.device(
+        "cuda"
+        if torch.cuda.is_available()
+        else "cpu"
+    )
+
+    print(
+        "Device:",
+        device
+    )
+
+    batch = next(
+        iter(dataloader)
+    )
+
+    with torch.no_grad():
+        test_outputs = model(
+            input_ids=batch[
+                "input_ids"
+            ],
+            token_type_ids=batch[
+                "token_type_ids"
+            ],
+            attention_mask=batch[
+                "attention_mask"
+            ]
+        )
+
+    print(
+        "\nMLM logits:",
+        test_outputs[
+            "prediction_logits"
+        ].shape
+    )
+
+    print(
+        "NSP logits:",
+        test_outputs[
+            "nsp_logits"
+        ].shape
+    )
+
+    print(
+        "\nTraining BERT...\n"
+    )
+
+    train(
+        model=model,
+        dataloader=dataloader,
+        device=device,
+        epochs=20,
+        learning_rate=3e-4
+    )
+
+    predict_mask(
+        model=model,
+        tokenizer=tokenizer,
+        text=(
+            "bert использует "
+            "[MASK] внимание"
+        ),
+        device=device,
+        max_length=max_length,
+        top_k=5
+    )
+
+    predict_next_sentence(
+        model=model,
+        tokenizer=tokenizer,
+        sentence_a=(
+            "трансформеры используют "
+            "механизм внимания"
+        ),
+        sentence_b=(
+            "механизм внимания позволяет "
+            "учитывать контекст слов"
+        ),
+        device=device,
+        max_length=max_length
+    )
+
+
+if __name__ == "__main__":
+    main()
